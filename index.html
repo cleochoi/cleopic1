@@ -128,7 +128,7 @@ const sid = (crypto.randomUUID ? crypto.randomUUID() : String(Math.random()) + D
 // phase: idle | recording | uploading | ready | error
 const state = QUESTIONS.map(() => ({plays:0, scriptShown:false, phase:"idle", wav:null, url:null, transcript:"", warn:"", seconds:0, done:false}));
 let cur = 0, speaking = false, recIndex = -1, submitted = false;
-let audioCtx = null, stream = null, source = null, proc = null, pcm = [], inRate = 48000, tick = null, startAt = 0;
+let stream = null, recorder = null, chunks = [], meterCtx = null, analyser = null, meterRaf = 0, tick = null, startAt = 0;
 
 const $ = id => document.getElementById(id);
 const busy = () => state.some(s => s.phase === "recording" || s.phase === "uploading");
@@ -161,34 +161,42 @@ function onListen(){
   if (speak(QUESTIONS[cur].text)){ s.plays++; render(); }
 }
 
-/* ---------- 녹음 (WAV) ---------- */
+/* ---------- 녹음 ----------
+   브라우저 내장 녹음기(MediaRecorder)로 끊김 없이 녹음 → 끝나면 16kHz WAV로 변환해서 서버로 보냄.
+   잡음제거·자동볼륨은 꺼서 소리가 들쭉날쭉하지 않게 함. */
 async function startRec(){
   if (busy() || speaking) return;
   if (!configured){ toast("선생님 설정이 필요해요."); return; }
   const name = $("studentName").value.trim();
   if (!name){ toast("녹음 전에 이름을 입력해 주세요."); $("studentName").focus(); return; }
-  const AC = window.AudioContext || window.webkitAudioContext;
-  if (!AC || !navigator.mediaDevices){ toast("이 브라우저는 녹음을 지원하지 않아요. 크롬이나 사파리로 열어주세요."); return; }
+  if (!window.MediaRecorder || !navigator.mediaDevices){ toast("이 브라우저는 녹음을 지원하지 않아요. 크롬이나 사파리 최신 버전으로 열어주세요."); return; }
 
-  audioCtx = new AC();                                  // 버튼 누른 순간에 만들어야 아이폰에서도 작동
+  const AC = window.AudioContext || window.webkitAudioContext;
+  if (AC){ try { meterCtx = new AC(); } catch(_){ meterCtx = null; } }   // 버튼 누른 순간에 만들어야 아이폰에서도 작동
   try {
-    stream = await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true, noiseSuppression:true, autoGainControl:true}});
+    stream = await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:false, noiseSuppression:false, autoGainControl:false, channelCount:1}});
   } catch(e){
-    audioCtx.close(); audioCtx = null;
+    if (meterCtx){ meterCtx.close().catch(()=>{}); meterCtx = null; }
     toast("마이크 권한을 허용해야 녹음할 수 있어요."); return;
   }
-  await audioCtx.resume();
-  inRate = audioCtx.sampleRate;
-  source = audioCtx.createMediaStreamSource(stream);
-  proc = audioCtx.createScriptProcessor(4096, 1, 1);
-  pcm = [];
-  proc.onaudioprocess = e => {
-    const ch = e.inputBuffer.getChannelData(0);
-    pcm.push(new Float32Array(ch));
-    let peak = 0; for (let i = 0; i < ch.length; i += 16) peak = Math.max(peak, Math.abs(ch[i]));
-    const m = $("meterBar"); if (m) m.style.width = Math.min(100, peak * 180) + "%";
-  };
-  source.connect(proc); proc.connect(audioCtx.destination);
+
+  // 소리 크기 막대 (녹음 자체와는 분리)
+  if (meterCtx){
+    try {
+      await meterCtx.resume();
+      analyser = meterCtx.createAnalyser(); analyser.fftSize = 1024;
+      meterCtx.createMediaStreamSource(stream).connect(analyser);
+    } catch(_){ analyser = null; }
+  }
+
+  const mime = ["audio/webm;codecs=opus", "audio/mp4", "audio/webm"].find(t => MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(t));
+  try {
+    recorder = new MediaRecorder(stream, mime ? {mimeType:mime, audioBitsPerSecond:128000} : undefined);
+  } catch(_){ recorder = new MediaRecorder(stream); }
+  chunks = [];
+  recorder.ondataavailable = e => { if (e.data && e.data.size) chunks.push(e.data); };
+  recorder.onstop = finishRec;
+  recorder.start(1000);
 
   const s = state[cur];
   if (s.url) URL.revokeObjectURL(s.url);
@@ -203,27 +211,80 @@ async function startRec(){
     if (sec >= MAX_SECONDS) stopRec();
   }, 250);
   render();
+  meterLoop();
+}
+
+function meterLoop(){
+  if (!analyser) return;
+  const d = new Uint8Array(analyser.fftSize);
+  analyser.getByteTimeDomainData(d);
+  let peak = 0; for (let i = 0; i < d.length; i += 4) peak = Math.max(peak, Math.abs(d[i] - 128) / 128);
+  const m = $("meterBar"); if (m) m.style.width = Math.min(100, peak * 160) + "%";
+  meterRaf = requestAnimationFrame(meterLoop);
 }
 
 function stopRec(){
   const s = state[recIndex];
   if (!s || s.phase !== "recording") return;
   clearInterval(tick);
-  try { source.disconnect(); proc.disconnect(); } catch(_){}
-  stream.getTracks().forEach(t => t.stop());
-  audioCtx.close(); audioCtx = null;
-  s.wav = encodeWav(downsample(mergePcm(pcm), inRate, TARGET_RATE), TARGET_RATE);
-  s.url = URL.createObjectURL(s.wav);
-  pcm = [];
-  upload(recIndex);
+  cancelAnimationFrame(meterRaf); analyser = null;
+  s.phase = "uploading"; render();
+  try { recorder.stop(); } catch(_){ finishRec(); }
 }
 
-function mergePcm(chunks){
-  let len = 0; chunks.forEach(c => len += c.length);
-  const out = new Float32Array(len); let o = 0;
-  chunks.forEach(c => { out.set(c, o); o += c.length; });
-  return out;
+async function finishRec(){
+  const i = recIndex, s = state[i];
+  if (stream){ stream.getTracks().forEach(t => t.stop()); stream = null; }
+  if (meterCtx){ meterCtx.close().catch(()=>{}); meterCtx = null; }
+  try {
+    const type = (recorder && recorder.mimeType) || (chunks[0] && chunks[0].type) || "audio/webm";
+    s.wav = await toWav(new Blob(chunks, {type}));
+  } catch(e){
+    s.phase = "idle"; s.wav = null; chunks = [];
+    toast("녹음을 처리하지 못했어요. 다시 녹음해 주세요."); render(); return;
+  }
+  chunks = [];
+  s.url = URL.createObjectURL(s.wav);
+  upload(i);
 }
+
+// 녹음 파일 → 16kHz 모노 WAV (+ 너무 작은 목소리는 적당히 키움)
+async function toWav(blob){
+  const AC = window.AudioContext || window.webkitAudioContext;
+  const ctx = new AC();
+  let decoded;
+  try {
+    const buf = await blob.arrayBuffer();
+    decoded = await new Promise((ok, fail) => { const p = ctx.decodeAudioData(buf, ok, fail); if (p && p.then) p.then(ok, fail); });
+  } finally { try { ctx.close(); } catch(_){} }
+
+  let mono;
+  try {
+    const OAC = window.OfflineAudioContext || window.webkitOfflineAudioContext;
+    const off = new OAC(1, Math.max(1, Math.ceil(decoded.duration * TARGET_RATE)), TARGET_RATE);
+    const src = off.createBufferSource(); src.buffer = decoded; src.connect(off.destination); src.start(0);
+    const out = await new Promise((ok, fail) => { off.oncomplete = e => ok(e.renderedBuffer); const p = off.startRendering(); if (p && p.then) p.then(ok, fail); });
+    mono = out.getChannelData(0);
+  } catch(_){
+    const ch0 = decoded.getChannelData(0);
+    let mix = ch0;
+    if (decoded.numberOfChannels > 1){
+      const ch1 = decoded.getChannelData(1); mix = new Float32Array(ch0.length);
+      for (let k = 0; k < ch0.length; k++) mix[k] = (ch0[k] + ch1[k]) / 2;
+    }
+    mono = downsample(mix, decoded.sampleRate, TARGET_RATE);
+  }
+  return encodeWav(normalize(mono), TARGET_RATE);
+}
+
+function normalize(x){
+  let peak = 0; for (let i = 0; i < x.length; i++) peak = Math.max(peak, Math.abs(x[i]));
+  if (peak < 0.01 || peak >= 0.85) return x;
+  const g = Math.min(4, 0.85 / peak), y = new Float32Array(x.length);
+  for (let i = 0; i < x.length; i++) y[i] = x[i] * g;
+  return y;
+}
+
 function downsample(buf, from, to){
   if (to >= from) return buf;
   const ratio = from / to, out = new Float32Array(Math.floor(buf.length / ratio));
