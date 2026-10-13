@@ -1,0 +1,430 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>클레오픽 CleoPIc</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Do+Hyeon&family=IBM+Plex+Mono:wght@500&family=IBM+Plex+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+/* Layout: 한 장짜리 시험지 — 이름표, 문항 탭, 문항 카드(듣기 → 녹음 → 확인), 하단 제출 패널 */
+:root{
+  --bg:#eef1f0; --surface:#ffffff; --ink:#18242a; --muted:#5b6a6f; --line:#d3dbda;
+  --accent:#1f5f6b; --accent-ink:#ffffff; --soft:#e1ebe9;
+  --rec:#d23f38; --ok:#2e7a4d;
+  --display:"Do Hyeon","IBM Plex Sans KR",system-ui,sans-serif;
+  --body:"IBM Plex Sans KR",system-ui,-apple-system,"Apple SD Gothic Neo","Malgun Gothic",sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){
+  :root{--bg:#11191c;--surface:#19252a;--ink:#e5eeed;--muted:#97a7aa;--line:#2b3a3f;
+    --accent:#72bcc7;--accent-ink:#0c1a1d;--soft:#1f323a;--rec:#ff6a61;--ok:#6fce95;color-scheme:dark}
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:16px;line-height:1.6;
+  padding-inline:16px;padding-block:calc(env(safe-area-inset-top,0px) + 20px) calc(env(safe-area-inset-bottom,0px) + 40px)}
+.wrap{max-width:640px;margin:0 auto;display:flex;flex-direction:column;gap:16px}
+header{display:flex;flex-direction:column;gap:4px}
+.brand{font-family:var(--display);font-size:2.4rem;line-height:1.1;margin:0;font-weight:400}
+.brand small{font-family:var(--mono);font-size:.8rem;color:var(--accent);letter-spacing:.12em;margin-left:8px;vertical-align:middle}
+.sub{color:var(--muted);margin:0;font-size:.95rem}
+.warnbar{background:var(--rec);color:#fff;border-radius:10px;padding:10px 14px;font-size:.9rem}
+.name{display:flex;gap:10px;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:10px 14px}
+.name label{font-weight:700;white-space:nowrap;font-size:.9rem}
+.name input{flex:1;min-width:0;border:0;background:transparent;color:var(--ink);font:inherit;outline:none}
+.name input[readonly]{color:var(--muted)}
+.tabs{display:grid;grid-template-columns:repeat(5,1fr);gap:6px}
+.tab{border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:10px;padding:8px 0;font:inherit;cursor:pointer;display:flex;flex-direction:column;align-items:center;line-height:1.2}
+.tab b{font-family:var(--mono);font-size:.95rem}
+.tab span{font-size:.72rem;color:var(--muted)}
+.tab[aria-selected="true"]{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}
+.tab.done{background:var(--soft)}
+.tab.done span{color:var(--ok);font-weight:700}
+.tab:disabled{opacity:.5;cursor:not-allowed}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:20px;display:flex;flex-direction:column;gap:18px}
+.qhead{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.chip{font-size:.75rem;font-weight:700;letter-spacing:.06em;padding:3px 10px;border-radius:999px;background:var(--soft);color:var(--accent)}
+.qnum{font-family:var(--mono);color:var(--muted);font-size:.85rem}
+.step{display:flex;flex-direction:column;gap:10px}
+.step h3{margin:0;font-size:.8rem;letter-spacing:.1em;color:var(--muted);font-weight:700}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+button.btn{font:inherit;font-weight:700;border-radius:10px;padding:11px 16px;cursor:pointer;border:1px solid var(--line);background:var(--surface);color:var(--ink)}
+button.btn.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+button.btn.rec{background:var(--rec);color:#fff;border-color:var(--rec)}
+button.btn:disabled{opacity:.45;cursor:not-allowed}
+button:focus-visible,input:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.hint{font-size:.85rem;color:var(--muted);margin:0}
+.script{border-left:3px solid var(--accent);background:var(--soft);padding:10px 14px;border-radius:0 10px 10px 0}
+.recbar{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.timer{font-family:var(--mono);font-size:1.4rem;font-variant-numeric:tabular-nums}
+.meter{flex:1;min-width:80px;height:8px;border-radius:99px;background:var(--soft);overflow:hidden}
+.meter i{display:block;height:100%;width:0;background:var(--rec);transition:width .08s linear}
+.transcript{min-height:80px;border:1px dashed var(--line);border-radius:10px;padding:12px 14px;
+  white-space:pre-wrap;overflow-wrap:anywhere;user-select:text;-webkit-user-select:text}
+.transcript.wait{color:var(--muted)}
+audio{width:100%}
+.err{font-size:.9rem;color:var(--rec);margin:0}
+.submit{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:20px;display:flex;flex-direction:column;gap:12px}
+.submit h2{font-family:var(--display);font-weight:400;font-size:1.5rem;margin:0}
+.progress{font-family:var(--mono);font-size:.9rem;color:var(--muted)}
+.linkbox{font-family:var(--mono);font-size:.85rem;background:var(--soft);border-radius:10px;padding:10px 14px;overflow-wrap:anywhere;user-select:all;-webkit-user-select:all}
+.toast{position:fixed;left:50%;bottom:calc(env(safe-area-inset-bottom,0px) + 20px);transform:translateX(-50%);background:var(--ink);color:var(--bg);
+  padding:10px 16px;border-radius:10px;font-size:.9rem;max-width:calc(100% - 32px);z-index:5}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1 class="brand">클레오픽<small>CleoPIc</small></h1>
+    <p class="sub">묘사 · 루틴 5문항 녹음 숙제. 질문을 듣고 영어로 답변하세요.</p>
+  </header>
+
+  <div class="warnbar" id="configWarn" hidden>선생님 설정이 아직 안 됐어요. index.html의 API_URL에 웹 앱 주소를 넣어주세요.</div>
+
+  <div class="name">
+    <label for="studentName">이름</label>
+    <input id="studentName" autocomplete="name" placeholder="녹음 전에 이름을 입력하세요">
+  </div>
+
+  <nav class="tabs" id="tabs" role="tablist"></nav>
+
+  <section class="card" id="card"></section>
+
+  <section class="submit">
+    <h2>숙제 제출</h2>
+    <div class="progress" id="progress"></div>
+    <div class="row"><button class="btn primary" id="submitBtn">제출하고 링크 받기</button></div>
+    <div id="linkArea" hidden>
+      <div class="linkbox" id="linkBox"></div>
+      <div class="row" style="margin-top:8px"><button class="btn primary" id="copyLinkBtn">링크 복사</button></div>
+      <p class="hint" style="margin-top:8px">복사한 링크를 카카오톡으로 선생님께 보내면 제출 끝!</p>
+    </div>
+  </section>
+</div>
+<div class="toast" id="toast" hidden></div>
+
+<script>
+/* ===== 선생님 설정 ===== */
+const API_URL = "https://script.google.com/macros/s/AKfycbwKznD-iw20x4tDb2LKAv-cgoJEvTWt1bGat-k70oQodISMQLXJveL4Gcpe_FLt7w4j/exec";   // 예: https://script.google.com/macros/s/AKfy.../exec
+
+const QUESTIONS = [
+  {type:"묘사", text:"I would like to know about your house. What does it look like? How many rooms does it have, and which room do you like the most? Please describe it in as much detail as possible."},
+  {type:"루틴", text:"Tell me about your typical weekday. What do you usually do from the moment you wake up until you go to bed? Please tell me everything in detail."},
+  {type:"묘사", text:"Describe a park you often go to. Where is it, what does it look like, and what kinds of things do people usually do there?"},
+  {type:"루틴", text:"What do you usually do on weekends? Describe your weekend routine from Saturday morning to Sunday night."},
+  {type:"묘사", text:"Tell me about your favorite café. Where is it located, what does it look like inside, and why do you like going there?"}
+];
+const MAX_REPLAYS = 2;       // 첫 듣기 이후 다시 듣기 횟수
+const MAX_SECONDS = 180;     // 녹음 최대 3분
+const TARGET_RATE = 16000;   // 저장 음질 (16kHz 모노 WAV)
+/* ====================== */
+
+const configured = /^https:\/\/script\.google\.com\//.test(API_URL);
+const sid = (crypto.randomUUID ? crypto.randomUUID() : String(Math.random()) + Date.now()).replace(/[^a-zA-Z0-9]/g, "").slice(0, 32);
+
+// phase: idle | recording | uploading | ready | error
+const state = QUESTIONS.map(() => ({plays:0, scriptShown:false, phase:"idle", wav:null, url:null, transcript:"", warn:"", seconds:0, done:false}));
+let cur = 0, speaking = false, recIndex = -1, submitted = false;
+let audioCtx = null, stream = null, source = null, proc = null, pcm = [], inRate = 48000, tick = null, startAt = 0;
+
+const $ = id => document.getElementById(id);
+const busy = () => state.some(s => s.phase === "recording" || s.phase === "uploading");
+
+/* ---------- 미국식 영어 음성 ---------- */
+let usVoice = null;
+function pickVoice(){
+  const vs = speechSynthesis.getVoices();
+  const prefer = ["Google US English","Samantha","Microsoft Aria","Microsoft Jenny","Alex","Aaron"];
+  usVoice = prefer.map(n => vs.find(v => v.name.includes(n))).find(Boolean)
+         || vs.find(v => (v.lang || "").replace("_","-") === "en-US") || null;
+}
+if ("speechSynthesis" in window){ pickVoice(); speechSynthesis.onvoiceschanged = pickVoice; }
+
+function speak(text){
+  if (!("speechSynthesis" in window)){ toast("이 브라우저는 질문 음성을 지원하지 않아요."); return false; }
+  speechSynthesis.cancel();
+  const u = new SpeechSynthesisUtterance(text);
+  u.lang = "en-US"; if (usVoice) u.voice = usVoice; u.rate = 0.92;
+  u.onend = u.onerror = () => { speaking = false; render(); };
+  speaking = true;
+  speechSynthesis.speak(u);
+  return true;
+}
+
+function onListen(){
+  const s = state[cur];
+  if (speaking || busy()) return;
+  if (s.plays > MAX_REPLAYS){ s.scriptShown = true; render(); return; }   // 세 번째 다시 듣기 → 스크립트 공개
+  if (speak(QUESTIONS[cur].text)){ s.plays++; render(); }
+}
+
+/* ---------- 녹음 (WAV) ---------- */
+async function startRec(){
+  if (busy() || speaking) return;
+  if (!configured){ toast("선생님 설정이 필요해요."); return; }
+  const name = $("studentName").value.trim();
+  if (!name){ toast("녹음 전에 이름을 입력해 주세요."); $("studentName").focus(); return; }
+  const AC = window.AudioContext || window.webkitAudioContext;
+  if (!AC || !navigator.mediaDevices){ toast("이 브라우저는 녹음을 지원하지 않아요. 크롬이나 사파리로 열어주세요."); return; }
+
+  audioCtx = new AC();                                  // 버튼 누른 순간에 만들어야 아이폰에서도 작동
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true, noiseSuppression:true, autoGainControl:true}});
+  } catch(e){
+    audioCtx.close(); audioCtx = null;
+    toast("마이크 권한을 허용해야 녹음할 수 있어요."); return;
+  }
+  await audioCtx.resume();
+  inRate = audioCtx.sampleRate;
+  source = audioCtx.createMediaStreamSource(stream);
+  proc = audioCtx.createScriptProcessor(4096, 1, 1);
+  pcm = [];
+  proc.onaudioprocess = e => {
+    const ch = e.inputBuffer.getChannelData(0);
+    pcm.push(new Float32Array(ch));
+    let peak = 0; for (let i = 0; i < ch.length; i += 16) peak = Math.max(peak, Math.abs(ch[i]));
+    const m = $("meterBar"); if (m) m.style.width = Math.min(100, peak * 180) + "%";
+  };
+  source.connect(proc); proc.connect(audioCtx.destination);
+
+  const s = state[cur];
+  if (s.url) URL.revokeObjectURL(s.url);
+  Object.assign(s, {phase:"recording", wav:null, url:null, transcript:"", warn:"", seconds:0, done:false});
+  recIndex = cur;
+  $("studentName").readOnly = true;                    // 같은 학생 폴더로 저장되도록 이름 고정
+  startAt = Date.now();
+  tick = setInterval(() => {
+    const sec = Math.floor((Date.now() - startAt) / 1000);
+    state[recIndex].seconds = sec;
+    const el = $("timer"); if (el) el.textContent = fmt(sec);
+    if (sec >= MAX_SECONDS) stopRec();
+  }, 250);
+  render();
+}
+
+function stopRec(){
+  const s = state[recIndex];
+  if (!s || s.phase !== "recording") return;
+  clearInterval(tick);
+  try { source.disconnect(); proc.disconnect(); } catch(_){}
+  stream.getTracks().forEach(t => t.stop());
+  audioCtx.close(); audioCtx = null;
+  s.wav = encodeWav(downsample(mergePcm(pcm), inRate, TARGET_RATE), TARGET_RATE);
+  s.url = URL.createObjectURL(s.wav);
+  pcm = [];
+  upload(recIndex);
+}
+
+function mergePcm(chunks){
+  let len = 0; chunks.forEach(c => len += c.length);
+  const out = new Float32Array(len); let o = 0;
+  chunks.forEach(c => { out.set(c, o); o += c.length; });
+  return out;
+}
+function downsample(buf, from, to){
+  if (to >= from) return buf;
+  const ratio = from / to, out = new Float32Array(Math.floor(buf.length / ratio));
+  for (let i = 0; i < out.length; i++){
+    const a = Math.floor(i * ratio), b = Math.min(buf.length, Math.floor((i + 1) * ratio));
+    let sum = 0; for (let j = a; j < b; j++) sum += buf[j];
+    out[i] = sum / Math.max(1, b - a);
+  }
+  return out;
+}
+function encodeWav(samples, rate){
+  const buf = new ArrayBuffer(44 + samples.length * 2), v = new DataView(buf);
+  const w = (o, s) => { for (let i = 0; i < s.length; i++) v.setUint8(o + i, s.charCodeAt(i)); };
+  w(0,"RIFF"); v.setUint32(4, 36 + samples.length * 2, true); w(8,"WAVE"); w(12,"fmt ");
+  v.setUint32(16,16,true); v.setUint16(20,1,true); v.setUint16(22,1,true);
+  v.setUint32(24,rate,true); v.setUint32(28,rate*2,true); v.setUint16(32,2,true); v.setUint16(34,16,true);
+  w(36,"data"); v.setUint32(40, samples.length * 2, true);
+  for (let i = 0, o = 44; i < samples.length; i++, o += 2){
+    const x = Math.max(-1, Math.min(1, samples[i]));
+    v.setInt16(o, x < 0 ? x * 0x8000 : x * 0x7FFF, true);
+  }
+  return new Blob([buf], {type:"audio/wav"});
+}
+
+/* ---------- 서버로 보내기 → 스크립트 받기 ---------- */
+function blobToBase64(blob){
+  return new Promise((ok, fail) => {
+    const r = new FileReader();
+    r.onload = () => ok(String(r.result).split(",")[1]);
+    r.onerror = fail;
+    r.readAsDataURL(blob);
+  });
+}
+async function api(payload){
+  const res = await fetch(API_URL, {method:"POST", headers:{"Content-Type":"text/plain;charset=utf-8"}, body:JSON.stringify(payload)});
+  const j = await res.json();
+  if (!j.ok) throw new Error(j.error || "서버 오류");
+  return j;
+}
+
+async function upload(i){
+  const s = state[i];
+  s.phase = "uploading"; s.warn = ""; render();
+  try {
+    const j = await api({
+      action:"answer", sid, name:$("studentName").value.trim(), q:i + 1,
+      qType:QUESTIONS[i].type, qText:QUESTIONS[i].text, seconds:s.seconds,
+      data: await blobToBase64(s.wav)
+    });
+    s.transcript = j.transcript || "";
+    s.warn = j.warn || "";
+    s.phase = "ready";
+  } catch(e){
+    s.phase = "error";
+    s.warn = "전송에 실패했어요. 인터넷 연결을 확인하고 ‘다시 보내기’를 눌러주세요.";
+  }
+  render();
+}
+
+function reRecord(){ state[cur].done = false; startRec(); }
+function confirmAnswer(){
+  const s = state[cur];
+  if (s.phase !== "ready") return;
+  s.done = true;
+  const next = state.findIndex(x => !x.done);
+  if (next !== -1) cur = next;
+  render();
+  toast(next === -1 ? "5문항 모두 완료! 아래에서 제출하세요." : "담았어요. Q" + (next + 1) + "로 넘어갑니다.");
+}
+
+/* ---------- 화면 ---------- */
+function fmt(sec){ return Math.floor(sec / 60) + ":" + String(sec % 60).padStart(2, "0"); }
+function esc(s){ return String(s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
+
+function renderTabs(){
+  const nav = $("tabs"); nav.innerHTML = "";
+  QUESTIONS.forEach((q, i) => {
+    const b = document.createElement("button");
+    b.className = "tab" + (state[i].done ? " done" : "");
+    b.setAttribute("role", "tab"); b.setAttribute("aria-selected", i === cur);
+    b.disabled = busy();
+    b.innerHTML = `<b>Q${i + 1}</b><span>${state[i].done ? "완료" : q.type}</span>`;
+    b.onclick = () => { if (!busy()){ if ("speechSynthesis" in window) speechSynthesis.cancel(); speaking = false; cur = i; render(); } };
+    nav.appendChild(b);
+  });
+}
+
+function renderCard(){
+  const q = QUESTIONS[cur], s = state[cur], card = $("card");
+  const left = Math.max(0, MAX_REPLAYS - Math.max(0, s.plays - 1));
+  let listenLabel, listenHint;
+  if (s.plays === 0){ listenLabel = "▶ 질문 듣기"; listenHint = "실제 시험처럼 질문은 소리로만 나와요."; }
+  else if (s.plays <= MAX_REPLAYS){ listenLabel = `↻ 다시 듣기 (${left}회 남음)`; listenHint = `다시 듣기는 ${MAX_REPLAYS}번까지 가능해요.`; }
+  else { listenLabel = s.scriptShown ? "질문 스크립트 표시됨" : "질문 스크립트 보기"; listenHint = "다시 듣기를 모두 사용했어요. 질문을 글로 확인하세요."; }
+
+  let recArea;
+  if (s.phase === "recording"){
+    recArea = `<button class="btn rec" id="stopBtn">■ 녹음 끝내기</button><span class="timer" id="timer">${fmt(s.seconds)}</span><span class="meter"><i id="meterBar"></i></span>`;
+  } else if (s.phase === "idle"){
+    recArea = `<button class="btn rec" id="recBtn" ${speaking || busy() ? "disabled" : ""}>● 녹음 시작</button><span class="hint">최대 ${MAX_SECONDS / 60}분</span>`;
+  } else {
+    recArea = `<span class="timer">${fmt(s.seconds)}</span><span class="hint">녹음 완료</span>`;
+  }
+
+  let tBox;
+  if (s.phase === "uploading") tBox = `<div class="transcript wait">스크립트를 만들고 있어요… (5~15초)</div>`;
+  else if (s.transcript) tBox = `<div class="transcript" lang="en">${esc(s.transcript)}</div>`;
+  else tBox = `<div class="transcript wait">녹음을 끝내면 답변이 영어 스크립트로 여기에 나타나요.</div>`;
+
+  const showReview = s.wav && (s.phase === "ready" || s.phase === "error" || s.phase === "uploading");
+
+  card.innerHTML = `
+    <div class="qhead"><span class="chip">${q.type}</span><span class="qnum">QUESTION ${cur + 1} / ${QUESTIONS.length}</span></div>
+
+    <div class="step">
+      <h3>1. 질문 듣기 · 미국식 발음</h3>
+      <div class="row"><button class="btn primary" id="listenBtn" ${speaking || busy() || s.scriptShown ? "disabled" : ""}>${speaking ? "재생 중…" : listenLabel}</button></div>
+      <p class="hint">${listenHint}</p>
+      ${s.scriptShown ? `<div class="script" lang="en">${esc(q.text)}</div>` : ""}
+    </div>
+
+    <div class="step">
+      <h3>2. 영어로 답변 녹음</h3>
+      <div class="recbar">${recArea}</div>
+    </div>
+
+    ${showReview ? `
+    <div class="step">
+      <h3>3. 들어보고 결정하기</h3>
+      <audio controls src="${s.url}"></audio>
+      ${tBox}
+      ${s.warn ? `<p class="err">${esc(s.warn)}</p>` : ""}
+      <div class="row">
+        <button class="btn" id="copyTBtn" ${s.transcript ? "" : "disabled"}>스크립트 복사</button>
+        ${s.phase === "error" ? `<button class="btn" id="retryBtn">다시 보내기</button>` : ""}
+      </div>
+      <div class="row">
+        <button class="btn" id="reBtn" ${s.phase === "uploading" ? "disabled" : ""}>다시 녹음</button>
+        <button class="btn primary" id="okBtn" ${s.phase !== "ready" || s.done ? "disabled" : ""}>${s.done ? "✓ 제출 목록에 담김" : "이 답변으로 제출"}</button>
+      </div>
+    </div>` : ""}
+  `;
+  const on = (id, fn) => { const el = $(id); if (el) el.onclick = fn; };
+  on("listenBtn", onListen); on("recBtn", startRec); on("stopBtn", stopRec);
+  on("reBtn", reRecord); on("okBtn", confirmAnswer); on("retryBtn", () => upload(cur));
+  on("copyTBtn", () => copyText(state[cur].transcript, "스크립트를 복사했어요."));
+}
+
+function renderSubmit(){
+  const n = state.filter(s => s.done).length;
+  $("progress").textContent = `제출 준비 ${n} / ${QUESTIONS.length}문항`;
+  $("submitBtn").disabled = n === 0 || busy();
+}
+
+function render(){ renderTabs(); renderCard(); renderSubmit(); }
+
+/* ---------- 제출 ---------- */
+async function submitAll(){
+  const qs = state.map((s, i) => s.done ? i + 1 : 0).filter(Boolean);
+  if (!qs.length) return;
+  if (qs.length < QUESTIONS.length && !$("submitBtn").dataset.sure){
+    $("submitBtn").dataset.sure = "1";
+    $("submitBtn").textContent = `${qs.length}문항만 제출하기`;
+    toast(`아직 ${QUESTIONS.length - qs.length}문항이 남았어요. 그래도 제출하려면 한 번 더 누르세요.`);
+    return;
+  }
+  const btn = $("submitBtn");
+  btn.disabled = true; btn.textContent = "제출 중…";
+  try {
+    const j = await api({action:"finalize", sid, name:$("studentName").value.trim(), qs});
+    $("linkBox").textContent = j.link;
+    $("linkArea").hidden = false;
+    btn.textContent = "다시 제출하기";
+    toast("제출 완료! 링크를 복사해서 보내주세요.");
+  } catch(e){
+    btn.textContent = "제출하고 링크 받기";
+    toast("제출에 실패했어요. 잠시 후 다시 눌러주세요.");
+  }
+  btn.disabled = false;
+}
+
+async function copyText(text, okMsg){
+  try { await navigator.clipboard.writeText(text); toast(okMsg); }
+  catch(_){
+    const ta = document.createElement("textarea"); ta.value = text; ta.readOnly = true;
+    ta.style.position = "fixed"; ta.style.opacity = "0"; document.body.appendChild(ta); ta.select();
+    try { document.execCommand("copy"); toast(okMsg); } catch(__){ toast("복사가 안 되면 링크를 길게 눌러 선택해 주세요."); }
+    ta.remove();
+  }
+}
+
+let toastTimer;
+function toast(m){ const t = $("toast"); t.textContent = m; t.hidden = false; clearTimeout(toastTimer); toastTimer = setTimeout(() => t.hidden = true, 3000); }
+
+$("submitBtn").onclick = submitAll;
+$("copyLinkBtn").onclick = () => copyText(`[클레오픽 숙제] ${$("studentName").value.trim()}\n${$("linkBox").textContent}`, "링크를 복사했어요. 카톡에 붙여넣어 보내세요.");
+$("configWarn").hidden = configured;
+try { $("studentName").value = localStorage.getItem("cleopic_name") || ""; } catch(_){}
+$("studentName").addEventListener("input", e => { try { localStorage.setItem("cleopic_name", e.target.value); } catch(_){} });
+window.addEventListener("beforeunload", e => { if (state.some(s => s.wav) && $("linkArea").hidden){ e.preventDefault(); e.returnValue = ""; } });
+render();
+</script>
+</body>
+</html>
