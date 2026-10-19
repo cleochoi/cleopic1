@@ -79,7 +79,7 @@ audio{width:100%}
 <div class="wrap">
   <header>
     <h1 class="brand">클레오픽<small>CleoPIc</small></h1>
-    <p class="sub">묘사 · 루틴 5문항 녹음 숙제. 질문을 듣고 영어로 답변하세요.</p>
+    <p class="sub">비교 5문항 녹음 숙제. 질문을 듣고 영어로 답변하세요.</p>
   </header>
 
   <div class="warnbar" id="configWarn" hidden>선생님 설정이 아직 안 됐어요. index.html의 API_URL에 웹 앱 주소를 넣어주세요.</div>
@@ -111,11 +111,11 @@ audio{width:100%}
 const API_URL = "https://script.google.com/macros/s/AKfycbwKznD-iw20x4tDb2LKAv-cgoJEvTWt1bGat-k70oQodISMQLXJveL4Gcpe_FLt7w4j/exec";   // 예: https://script.google.com/macros/s/AKfy.../exec
 
 const QUESTIONS = [
-  {type:"묘사", text:"I would like to know about your house. What does it look like? How many rooms does it have, and which room do you like the most? Please describe it in as much detail as possible."},
-  {type:"루틴", text:"Tell me about your typical weekday. What do you usually do from the moment you wake up until you go to bed? Please tell me everything in detail."},
-  {type:"묘사", text:"Describe a park you often go to. Where is it, what does it look like, and what kinds of things do people usually do there?"},
-  {type:"루틴", text:"What do you usually do on weekends? Describe your weekend routine from Saturday morning to Sunday night."},
-  {type:"묘사", text:"Tell me about your favorite café. Where is it located, what does it look like inside, and why do you like going there?"}
+  {type:"비교", text:"How is your current neighborhood different from the one you grew up in?"},
+  {type:"비교", text:"How has your relationship with your best friend changed compared to before?"},
+  {type:"비교", text:"Compare your current favorite hobby with one you enjoyed in the past."},
+  {type:"비교", text:"Compare your most recent trip with a trip you took in the past."},
+  {type:"비교", text:"How is traveling these days different from traveling in the past?"}
 ];
 const MAX_REPLAYS = 2;       // 첫 듣기 이후 다시 듣기 횟수
 const MAX_SECONDS = 180;     // 녹음 최대 3분
