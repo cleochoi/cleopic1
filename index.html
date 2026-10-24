@@ -36,7 +36,7 @@ header{display:flex;flex-direction:column;gap:4px}
 .name label{font-weight:700;white-space:nowrap;font-size:.9rem}
 .name input{flex:1;min-width:0;border:0;background:transparent;color:var(--ink);font:inherit;outline:none}
 .name input[readonly]{color:var(--muted)}
-.tabs{display:grid;grid-template-columns:repeat(5,1fr);gap:6px}
+.tabs{display:grid;grid-template-columns:repeat(6,1fr);gap:6px}
 .tab{border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:10px;padding:8px 0;font:inherit;cursor:pointer;display:flex;flex-direction:column;align-items:center;line-height:1.2}
 .tab b{font-family:var(--mono);font-size:.95rem}
 .tab span{font-size:.72rem;color:var(--muted)}
@@ -47,7 +47,7 @@ header{display:flex;flex-direction:column;gap:4px}
 .card{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:20px;display:flex;flex-direction:column;gap:18px}
 .qhead{display:flex;justify-content:space-between;align-items:center;gap:8px}
 .chip{font-size:.75rem;font-weight:700;letter-spacing:.06em;padding:3px 10px;border-radius:999px;background:var(--soft);color:var(--accent)}
-.qnum{font-family:var(--mono);color:var(--muted);font-size:.85rem}
+.qnum{font-family:var(--mono);color:var(--muted);font-size:.85rem;white-space:nowrap}
 .step{display:flex;flex-direction:column;gap:10px}
 .step h3{margin:0;font-size:.8rem;letter-spacing:.1em;color:var(--muted);font-weight:700}
 .row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
@@ -79,7 +79,7 @@ audio{width:100%}
 <div class="wrap">
   <header>
     <h1 class="brand">클레오픽<small>CleoPIc</small></h1>
-    <p class="sub">비교 5문항 녹음 숙제. 질문을 듣고 영어로 답변하세요.</p>
+    <p class="sub">롤플레이 · 콤보 12문항 녹음 숙제. 질문을 듣고 영어로 답변하세요.</p>
   </header>
 
   <div class="warnbar" id="configWarn" hidden>선생님 설정이 아직 안 됐어요. index.html의 API_URL에 웹 앱 주소를 넣어주세요.</div>
@@ -111,11 +111,18 @@ audio{width:100%}
 const API_URL = "https://script.google.com/macros/s/AKfycbwKznD-iw20x4tDb2LKAv-cgoJEvTWt1bGat-k70oQodISMQLXJveL4Gcpe_FLt7w4j/exec";   // 예: https://script.google.com/macros/s/AKfy.../exec
 
 const QUESTIONS = [
-  {type:"비교", text:"How is your current neighborhood different from the one you grew up in?"},
-  {type:"비교", text:"How has your relationship with your best friend changed compared to before?"},
-  {type:"비교", text:"Compare your current favorite hobby with one you enjoyed in the past."},
-  {type:"비교", text:"Compare your most recent trip with a trip you took in the past."},
-  {type:"비교", text:"How is traveling these days different from traveling in the past?"}
+  {type:"롤플11", label:"롤플레이 11 · 정보요청 · 공연/콘서트 티켓", text:"I'd like to give you a situation and ask you to act it out. You want to buy tickets for a concert. Call the ticket office and ask three or four questions to get the information you need to buy the tickets."},
+  {type:"콤보3", label:"콤보 3 · 음악 감상 · 기억에 남는 공연", text:"Tell me about a memorable experience you had while listening to live music. When and where was it? Who were you with? What made that performance so special? Please describe everything in detail."},
+  {type:"롤플12", label:"롤플레이 12 · 문제해결 · 티켓 문제", text:"I'm sorry, but there is a problem I need you to resolve. When you arrived at the concert, you realized the tickets you bought were for the wrong date. Call the box office, explain the situation, and offer two or three alternatives to solve the problem."},
+  {type:"콤보3", label:"콤보 3 · 집 · 집의 변화", text:"Tell me about how your home has changed over the years. What did your home look like when you were a child, and how is it different now? Has your home changed in any special way? Please give me as many details as possible."},
+  {type:"롤플11", label:"롤플레이 11 · 정보요청 · 여행 계획 질문", text:"Your friend has just come back from a trip to another country. You are planning to visit the same place. Call your friend and ask three or four questions about the trip."},
+  {type:"콤보3", label:"콤보 3 · 해외/국내여행 · 여행 중 예상치 못한 일", text:"Tell me about something unexpected or unusual that happened while you were traveling. When and where did it happen? Who were you with? How did you deal with the situation? Please tell me the whole story from beginning to end."},
+  {type:"롤플12", label:"롤플레이 12 · 문제해결 · 호텔 예약 문제", text:"I'm sorry, but there is a problem I need you to resolve. When you arrived at the hotel, the staff told you that your reservation had been cancelled and no rooms are available. Explain the situation to the front desk clerk and offer two or three alternatives."},
+  {type:"콤보3", label:"콤보 3 · 영화보기 · 기억에 남는 영화 관람 경험", text:"Tell me about a memorable experience you had at a movie theater. Was there something funny, surprising, or disappointing that happened? What was the movie, and who were you with? Describe that day in detail."},
+  {type:"롤플13", label:"롤플레이 13 · 관련 경험 · 계획 변경 경험", text:"That's the end of the situation. Have you ever had a similar experience where your plans changed suddenly because of an unexpected problem? Tell me what happened and how you handled it. Please give me all the details."},
+  {type:"콤보3", label:"콤보 3 · 공원가기 · 공원에서 있었던 일", text:"Tell me about a memorable experience you had at a park. What did you do there, and who were you with? Why is that day still memorable to you? Please describe it in detail."},
+  {type:"롤플11", label:"롤플레이 11 · 정보요청 · 가구/전자제품 구매", text:"You want to buy a new piece of furniture for your home. Call the furniture store and ask three or four questions about the item you want to buy."},
+  {type:"롤플12", label:"롤플레이 12 · 문제해결 · 배송 제품 파손", text:"I'm sorry, but there is a problem I need you to resolve. The furniture you ordered was delivered, but it is damaged. Call the store, explain what happened, and suggest two or three ways to resolve the problem."}
 ];
 const MAX_REPLAYS = 2;       // 첫 듣기 이후 다시 듣기 횟수
 const MAX_SECONDS = 180;     // 녹음 최대 3분
@@ -320,7 +327,7 @@ async function upload(i){
   try {
     const j = await api({
       action:"answer", sid, name:$("studentName").value.trim(), q:i + 1,
-      qType:QUESTIONS[i].type, qText:QUESTIONS[i].text, seconds:s.seconds,
+      qType:QUESTIONS[i].label || QUESTIONS[i].type, qText:QUESTIONS[i].text, seconds:s.seconds,
       data: await blobToBase64(s.wav)
     });
     s.transcript = j.transcript || "";
@@ -341,7 +348,7 @@ function confirmAnswer(){
   const next = state.findIndex(x => !x.done);
   if (next !== -1) cur = next;
   render();
-  toast(next === -1 ? "5문항 모두 완료! 아래에서 제출하세요." : "담았어요. Q" + (next + 1) + "로 넘어갑니다.");
+  toast(next === -1 ? QUESTIONS.length + "문항 모두 완료! 아래에서 제출하세요." : "담았어요. Q" + (next + 1) + "로 넘어갑니다.");
 }
 
 /* ---------- 화면 ---------- */
@@ -386,7 +393,7 @@ function renderCard(){
   const showReview = s.wav && (s.phase === "ready" || s.phase === "error" || s.phase === "uploading");
 
   card.innerHTML = `
-    <div class="qhead"><span class="chip">${q.type}</span><span class="qnum">QUESTION ${cur + 1} / ${QUESTIONS.length}</span></div>
+    <div class="qhead"><span class="chip">${esc(q.label || q.type)}</span><span class="qnum">QUESTION ${cur + 1} / ${QUESTIONS.length}</span></div>
 
     <div class="step">
       <h3>1. 질문 듣기 · 미국식 발음</h3>
