@@ -79,7 +79,7 @@ audio{width:100%}
 <div class="wrap">
   <header>
     <h1 class="brand">클레오픽<small>CleoPIc</small></h1>
-    <p class="sub">묘사 · 루틴 5문항 녹음 숙제. 질문을 듣고 영어로 답변하세요.</p>
+    <p class="sub">요일별 비교 · 경험 5문항 녹음 숙제 (월~금). 질문을 듣고 영어로 답변하세요.</p>
   </header>
 
   <div class="warnbar" id="configWarn" hidden>선생님 설정이 아직 안 됐어요. index.html의 API_URL에 웹 앱 주소를 넣어주세요.</div>
@@ -111,11 +111,11 @@ audio{width:100%}
 const API_URL = "https://script.google.com/macros/s/AKfycbwKznD-iw20x4tDb2LKAv-cgoJEvTWt1bGat-k70oQodISMQLXJveL4Gcpe_FLt7w4j/exec";   // 예: https://script.google.com/macros/s/AKfy.../exec
 
 const QUESTIONS = [
-  {type:"묘사", label:"묘사 · 집 · 우리 집 소개", text:"Tell me about the home you live in. What does it look like? How many rooms does it have? Which room is your favorite, and why? Please describe your home in as much detail as possible."},
-  {type:"묘사", label:"묘사 · 동네 · 우리 동네", text:"Describe the neighborhood you live in. What does it look like, and what kinds of buildings or places are there? What do you like most about your neighborhood? Please tell me in detail."},
-  {type:"루틴", label:"루틴 · 음악 감상 · 음악 듣는 습관", text:"When and where do you usually listen to music? How do you listen to it, for example on your phone or with speakers? What kind of music do you usually listen to? Tell me about your music listening routine in detail."},
-  {type:"루틴", label:"루틴 · 영화보기 · 영화 보는 날", text:"Tell me about what you usually do when you go to the movies. Who do you usually go with? What do you do before and after the movie? Please describe a typical day when you go to see a movie, from beginning to end."},
-  {type:"묘사", label:"묘사 · 공원 · 자주 가는 공원", text:"Tell me about a park you often go to. Where is it, and what does it look like? What kinds of things do people usually do there? Please describe the park in as much detail as possible."}
+  {type:"카페", label:"월 · 카페 · Part 2 장소 비교", text:"Tell me about a coffee shop you used to go to in the past and compare it with one you go to now."},
+  {type:"쇼핑", label:"화 · 쇼핑 · Part 1 취향 비교", text:"How has the way you shop changed over the years? How did you shop in the past, and how do you shop now?"},
+  {type:"은행", label:"수 · 은행 · Part 3 변화 비교", text:"How have banks changed in your country? How did people use banks in the past, and how do they use them now?"},
+  {type:"호텔", label:"목 · 호텔 · Part 4 경험담", text:"Tell me about a memorable experience you had at a hotel. When was it, who were you with, and what happened?"},
+  {type:"대중교통", label:"금 · 대중교통 · Part 3 변화 비교", text:"How has public transportation in your country changed since you were young?"}
 ];
 const MAX_REPLAYS = 2;       // 첫 듣기 이후 다시 듣기 횟수
 const MAX_SECONDS = 180;     // 녹음 최대 3분
