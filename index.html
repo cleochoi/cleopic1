@@ -37,20 +37,6 @@ header{display:flex;flex-direction:column;gap:4px}
 .name input{flex:1;min-width:0;border:0;background:transparent;color:var(--ink);font:inherit;outline:none}
 .name input[readonly]{color:var(--muted)}
 .tabs{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
-[hidden]{display:none!important}
-.until{margin:0;font-size:.85rem;color:var(--accent);font-weight:700}
-.sets{display:flex;gap:6px;overflow-x:auto;padding-bottom:2px}
-.setbtn{flex:0 0 auto;font:inherit;font-size:.85rem;font-weight:700;border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:999px;padding:6px 12px;cursor:pointer}
-.setbtn[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
-.setbtn.sent::after{content:" ✓";color:inherit}
-.setbtn:disabled{opacity:.5;cursor:not-allowed}
-.eval{border:1px solid var(--line);border-radius:12px;padding:12px 14px;display:flex;flex-direction:column;gap:6px;font-size:.92rem;background:var(--bg)}
-.eval p{margin:0}.eval ul{margin:0;padding-left:20px}
-.evhead{display:flex;justify-content:space-between;align-items:center;gap:8px}
-.evhead .t{font-size:.8rem;letter-spacing:.08em;color:var(--muted);font-weight:700}
-.lvl{font-family:var(--mono);font-weight:700;color:var(--accent-ink);background:var(--accent);border-radius:999px;padding:2px 10px;font-size:.85rem}
-.sum{font-weight:700}
-.fix li{margin-bottom:6px}.before{display:block;color:var(--muted);text-decoration:line-through}.after{display:block;font-weight:500}
 .tab{border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:10px;padding:8px 0;font:inherit;cursor:pointer;display:flex;flex-direction:column;align-items:center;line-height:1.2}
 .tab b{font-family:var(--mono);font-size:.95rem}
 .tab span{font-size:.72rem;color:var(--muted)}
@@ -85,6 +71,15 @@ audio{width:100%}
 .submit h2{font-family:var(--display);font-weight:400;font-size:1.5rem;margin:0}
 .progress{font-family:var(--mono);font-size:.9rem;color:var(--muted)}
 .linkbox{font-family:var(--mono);font-size:.85rem;background:var(--soft);border-radius:10px;padding:10px 14px;overflow-wrap:anywhere;user-select:all;-webkit-user-select:all}
+[hidden]{display:none!important}
+.until{margin:0;font-size:.85rem;color:var(--accent);font-weight:700}
+.eval{border:1px solid var(--line);border-radius:12px;padding:12px 14px;display:flex;flex-direction:column;gap:6px;font-size:.92rem;background:var(--bg)}
+.eval p{margin:0}.eval ul{margin:0;padding-left:20px}
+.evhead{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.evhead .t{font-size:.8rem;letter-spacing:.08em;color:var(--muted);font-weight:700}
+.lvl{font-family:var(--mono);font-weight:700;color:var(--accent-ink);background:var(--accent);border-radius:999px;padding:2px 10px;font-size:.85rem}
+.sum{font-weight:700}
+.fix li{margin-bottom:6px}.before{display:block;color:var(--muted);text-decoration:line-through}.after{display:block;font-weight:500}
 .toast{position:fixed;left:50%;bottom:calc(env(safe-area-inset-bottom,0px) + 20px);transform:translateX(-50%);background:var(--ink);color:var(--bg);
   padding:10px 16px;border-radius:10px;font-size:.9rem;max-width:calc(100% - 32px);z-index:5}
 </style>
@@ -93,25 +88,17 @@ audio{width:100%}
 <div class="wrap">
   <header>
     <h1 class="brand">클레오픽<small>CleoPIc</small></h1>
-    <p class="sub">이번 주 숙제 · 롤플레이 11–13번 5세트. 세트마다 질문 3개를 듣고 영어로 답변하세요. 답변하면 AI 평가가 바로 나와요.</p>
+    <p class="sub">롤플레이 11–13번 5세트 15문항 녹음 숙제. 한 줄이 한 세트예요. 질문을 듣고 영어로 답변하세요.</p>
   </header>
 
+  <p class="until" id="untilLine" hidden></p>
+  <div class="warnbar" id="expiredBar" hidden></div>
   <div class="warnbar" id="configWarn" hidden>선생님 설정이 아직 안 됐어요. index.html의 API_URL에 웹 앱 주소를 넣어주세요.</div>
 
   <div class="name">
     <label for="studentName">이름</label>
     <input id="studentName" autocomplete="name" placeholder="녹음 전에 이름을 입력하세요">
   </div>
-  <div class="name" id="codeRow">
-    <label for="accessCode">수강 코드</label>
-    <input id="accessCode" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="선생님께 받은 코드" style="text-transform:uppercase;letter-spacing:.08em">
-    <button class="btn primary" id="enterBtn" style="padding:7px 14px">입장</button>
-  </div>
-  <p class="err" id="enterErr" hidden></p>
-  <p class="until" id="untilLine" hidden></p>
-
-  <div id="main" hidden style="display:flex;flex-direction:column;gap:16px">
-  <nav class="sets" id="sets"></nav>
 
   <nav class="tabs" id="tabs" role="tablist"></nav>
 
@@ -127,7 +114,6 @@ audio{width:100%}
       <p class="hint" style="margin-top:8px">복사한 링크를 카카오톡으로 선생님께 보내면 제출 끝!</p>
     </div>
   </section>
-  </div>
 </div>
 <div class="toast" id="toast" hidden></div>
 
@@ -135,48 +121,33 @@ audio{width:100%}
 /* ===== 선생님 설정 ===== */
 const API_URL = "https://script.google.com/macros/s/AKfycbytcxUCg0qpNVSeOH7qCSTo_keUsxSEG-kbzUf3A3XihPmdnqCuQ19exF_huxwMektw/exec";   // 예: https://script.google.com/macros/s/AKfy.../exec
 
-const SETS = [
-  {name:"세트 1 · 영화", qs:[
-    {type:"11 정보요청", label:"롤플레이 11 · 정보요청 · 영화 약속", text:"I'd like to give you a situation and ask you to act it out. You want to see a movie with your friend this weekend. Call your friend and ask three or four questions to make plans."},
-    {type:"12 문제해결", label:"롤플레이 12 · 문제해결 · 영화 약속", text:"I'm sorry, but there is a problem I need you to resolve. When you arrived at the theater, you found out that the movie tickets you booked were for a different day, and the show is sold out. Call your friend, explain the situation, and suggest two or three alternatives."},
-    {type:"13 관련경험", label:"롤플레이 13 · 관련 경험 · 영화 약속", text:"That's the end of the situation. Have you ever had plans with a friend that did not work out? What happened, and how did you deal with the situation? Please tell me the whole story in detail."}
-  ]},
-  {name:"세트 2 · 휴대폰", qs:[
-    {type:"11 정보요청", label:"롤플레이 11 · 정보요청 · 휴대폰 구매", text:"I'd like to give you a situation and ask you to act it out. You want to buy a new cell phone. Go to an electronics store and ask the clerk three or four questions about the phone you want to buy."},
-    {type:"12 문제해결", label:"롤플레이 12 · 문제해결 · 휴대폰 구매", text:"I'm sorry, but there is a problem I need you to resolve. You bought a new phone a few days ago, but it has stopped working. Call the store, explain the problem, and offer two or three alternatives to solve it."},
-    {type:"13 관련경험", label:"롤플레이 13 · 관련 경험 · 휴대폰 구매", text:"That's the end of the situation. Have you ever had a problem with an electronic device such as a phone or a computer? When was it, what happened, and how did you solve the problem? Please give me all the details."}
-  ]},
-  {name:"세트 3 · 은행", qs:[
-    {type:"11 정보요청", label:"롤플레이 11 · 정보요청 · 은행 업무", text:"I'd like to give you a situation and ask you to act it out. You want to open a new bank account. Call the bank and ask three or four questions about opening an account."},
-    {type:"12 문제해결", label:"롤플레이 12 · 문제해결 · 은행 업무", text:"I'm sorry, but there is a problem I need you to resolve. You have just realized that you lost your bank card, and you need money today. Call the bank, explain the situation, and suggest two or three ways to solve the problem."},
-    {type:"13 관련경험", label:"롤플레이 13 · 관련 경험 · 은행 업무", text:"That's the end of the situation. Have you ever had a problem at a bank or with your money, for example losing your card or your wallet? Tell me what happened and how you handled it from beginning to end."}
-  ]},
-  {name:"세트 4 · 병원", qs:[
-    {type:"11 정보요청", label:"롤플레이 11 · 정보요청 · 병원 예약", text:"I'd like to give you a situation and ask you to act it out. You are not feeling well and want to see a doctor. Call the clinic and ask three or four questions to make an appointment."},
-    {type:"12 문제해결", label:"롤플레이 12 · 문제해결 · 병원 예약", text:"I'm sorry, but there is a problem I need you to resolve. You have an appointment with the doctor today, but something urgent came up and you cannot go. Call the clinic, explain the situation, and offer two or three alternatives."},
-    {type:"13 관련경험", label:"롤플레이 13 · 관련 경험 · 병원 예약", text:"That's the end of the situation. Have you ever had to cancel or change an important appointment at the last minute? What happened, and how did you deal with it? Please describe the experience in detail."}
-  ]},
-  {name:"세트 5 · 카페", qs:[
-    {type:"11 정보요청", label:"롤플레이 11 · 정보요청 · 카페 주문", text:"I'd like to give you a situation and ask you to act it out. A new caf\u00e9 has opened in your neighborhood. Call the caf\u00e9 and ask three or four questions about the caf\u00e9 and its menu."},
-    {type:"12 문제해결", label:"롤플레이 12 · 문제해결 · 카페 주문", text:"I'm sorry, but there is a problem I need you to resolve. You ordered drinks and a cake from the caf\u00e9 for a party, but they delivered the wrong order. Call the caf\u00e9, explain the problem, and suggest two or three ways to solve it."},
-    {type:"13 관련경험", label:"롤플레이 13 · 관련 경험 · 카페 주문", text:"That's the end of the situation. Have you ever received the wrong order at a restaurant or caf\u00e9, or had another problem while eating out? Tell me what happened and how the problem was solved."}
-  ]}
+const QUESTIONS = [
+  {type:"헬스장 11", label:"세트 1 헬스장 등록 · 롤플레이 11 · 정보요청", text:"You want to sign up for a new gym. Call the gym and ask three or four questions about its membership, facilities, and operating hours."},
+  {type:"헬스장 12", label:"세트 1 헬스장 등록 · 롤플레이 12 · 문제해결", text:"You just found out that the gym is closed during the hours you usually work out. Call the gym, explain the problem, and suggest a solution."},
+  {type:"헬스장 13", label:"세트 1 헬스장 등록 · 롤플레이 13 · 관련 경험", text:"Have you ever had a problem with a gym, sports club, or class? What happened, and how did you deal with it?"},
+  {type:"공연 11", label:"세트 2 공연 티켓 · 롤플레이 11 · 정보요청", text:"Your friend is going to a concert. Call your friend and ask three or four questions about the concert, such as the date, venue, and ticket price."},
+  {type:"공연 12", label:"세트 2 공연 티켓 · 롤플레이 12 · 문제해결", text:"You can no longer attend because something unexpected came up. Call your friend, explain the situation, and suggest what to do with your ticket."},
+  {type:"공연 13", label:"세트 2 공연 티켓 · 롤플레이 13 · 관련 경험", text:"Tell me about a time when you had to cancel or change plans for an event. What happened?"},
+  {type:"스마트폰 11", label:"세트 3 스마트폰 구매 · 롤플레이 11 · 정보요청", text:"You want to buy a new smartphone. Call an electronics store and ask three or four questions about the models, prices, and available features."},
+  {type:"스마트폰 12", label:"세트 3 스마트폰 구매 · 롤플레이 12 · 문제해결", text:"After buying the phone, you discover that it has a problem. Call the store, explain the issue, and ask them to help you resolve it."},
+  {type:"스마트폰 13", label:"세트 3 스마트폰 구매 · 롤플레이 13 · 관련 경험", text:"Have you ever bought something that didn't work properly? Describe what happened and how you handled it."},
+  {type:"숙소 11", label:"세트 4 여행 숙소 예약 · 롤플레이 11 · 정보요청", text:"You are planning a trip and want to book a hotel. Call the hotel and ask three or four questions about the room, location, and services."},
+  {type:"숙소 12", label:"세트 4 여행 숙소 예약 · 롤플레이 12 · 문제해결", text:"The hotel tells you that your reservation cannot be found when you arrive. Talk to the front desk, explain the situation, and work out a solution."},
+  {type:"숙소 13", label:"세트 4 여행 숙소 예약 · 롤플레이 13 · 관련 경험", text:"Tell me about a time when something went wrong during a trip. What was the problem, and what did you do?"},
+  {type:"빌리기 11", label:"세트 5 친구에게 물건 빌리기 · 롤플레이 11 · 정보요청", text:"You want to borrow a camera from your friend for a weekend trip. Call your friend and ask three or four questions about the camera and when you can pick it up."},
+  {type:"빌리기 12", label:"세트 5 친구에게 물건 빌리기 · 롤플레이 12 · 문제해결", text:"You accidentally damage the camera. Call your friend, explain what happened, and suggest how you will make it right."},
+  {type:"빌리기 13", label:"세트 5 친구에게 물건 빌리기 · 롤플레이 13 · 관련 경험", text:"Have you ever borrowed or lent something that got lost or damaged? Tell me what happened."}
 ];
-let setIdx = 0;
-let QUESTIONS = SETS[0].qs;
 const MAX_REPLAYS = 2;       // 첫 듣기 이후 다시 듣기 횟수
 const MAX_SECONDS = 180;     // 녹음 최대 3분
 const TARGET_RATE = 16000;   // 저장 음질 (16kHz 모노 WAV)
 /* ====================== */
 
 const configured = /^https:\/\/script\.google\.com\//.test(API_URL);
-const newSid = () => (crypto.randomUUID ? crypto.randomUUID() : String(Math.random()) + Date.now()).replace(/[^a-zA-Z0-9]/g, "").slice(0, 32);
-const blankState = qs => qs.map(() => ({plays:0, scriptShown:false, phase:"idle", wav:null, url:null, transcript:"", warn:"", ev:null, seconds:0, done:false}));
-const store = SETS.map(st => ({sid:newSid(), state:blankState(st.qs), cur:0, link:""}));   // 세트마다 따로 저장·제출
-let sid = store[0].sid, code = "";
+const sid = (crypto.randomUUID ? crypto.randomUUID() : String(Math.random()) + Date.now()).replace(/[^a-zA-Z0-9]/g, "").slice(0, 32);
 
 // phase: idle | recording | uploading | ready | error
-let state = store[0].state;
+const state = QUESTIONS.map(() => ({plays:0, scriptShown:false, phase:"idle", wav:null, url:null, transcript:"", warn:"", seconds:0, done:false}));
 let cur = 0, speaking = false, recIndex = -1, submitted = false;
 let audioCtx = null, stream = null, source = null, node = null, mute = null, pcm = [], inRate = 48000, tick = null, startAt = 0;
 
@@ -227,6 +198,7 @@ function onChunk(ch){
 async function startRec(){
   if (busy() || speaking) return;
   if (!configured){ toast("선생님 설정이 필요해요."); return; }
+  if (expired){ toast(expired); return; }
   const name = $("studentName").value.trim();
   if (!name){ toast("녹음 전에 이름을 입력해 주세요."); $("studentName").focus(); return; }
   const AC = window.AudioContext || window.webkitAudioContext;
@@ -236,7 +208,7 @@ async function startRec(){
 
   audioCtx = new AC();                                  // 버튼 누른 순간에 만들어야 아이폰에서도 작동
   try {
-    stream = await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true, noiseSuppression:false, autoGainControl:true}});
+    stream = await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:false, noiseSuppression:false, autoGainControl:true}});
   } catch(e){
     audioCtx.close(); audioCtx = null;
     toast("마이크를 쓸 수 없어요. 마이크 권한을 허용해 주세요. (" + (e && e.name || "오류") + ")"); return;
@@ -261,16 +233,6 @@ async function startRec(){
     }
     mute = audioCtx.createGain(); mute.gain.value = 0;   // 스피커로는 안 나가게
     source.connect(node); node.connect(mute); mute.connect(audioCtx.destination);
-    // 폰 내장 녹음기로도 같이 녹음 (끊김 없는 원본 · 다시 듣기와 제출에 우선 사용)
-    mrChunks = []; mr = null;
-    if (window.MediaRecorder){
-      try {
-        const mt = ["audio/webm;codecs=opus", "audio/mp4", "audio/webm", "audio/ogg"].find(t => MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(t));
-        mr = new MediaRecorder(stream, mt ? {mimeType:mt} : undefined);
-        mr.ondataavailable = e => { if (e.data && e.data.size) mrChunks.push(e.data); };
-        mr.start(1000);
-      } catch(_){ mr = null; }
-    }
   } catch(e){
     cleanupAudio();
     toast("녹음을 시작하지 못했어요. 페이지를 새로고침해 주세요. (" + (e && e.name || "오류") + ")"); return;
@@ -291,30 +253,6 @@ async function startRec(){
   render();
 }
 
-let mr = null, mrChunks = [];
-function stopRecorder(){
-  return new Promise(ok => {
-    if (!mr || mr.state === "inactive") return ok(null);
-    const t = setTimeout(() => ok(null), 3000);
-    mr.onstop = () => { clearTimeout(t); ok(new Blob(mrChunks, {type: mr.mimeType || (mrChunks[0] && mrChunks[0].type) || "audio/webm"})); };
-    try { mr.stop(); } catch(_){ clearTimeout(t); ok(null); }
-  });
-}
-// 내장 녹음기 파일 → 16kHz 모노 WAV (서버로 보낼 용도)
-async function blobToWav(blob){
-  const AC = window.AudioContext || window.webkitAudioContext, ctx = new AC();
-  let dec;
-  try {
-    const buf = await blob.arrayBuffer();
-    dec = await new Promise((ok, fail) => { const p = ctx.decodeAudioData(buf, ok, fail); if (p && p.then) p.then(ok, fail); });
-  } finally { try { ctx.close(); } catch(_){} }
-  const ch0 = dec.getChannelData(0);
-  let mono = ch0;
-  if (dec.numberOfChannels > 1){ const ch1 = dec.getChannelData(1); mono = new Float32Array(ch0.length); for (let i = 0; i < ch0.length; i++) mono[i] = (ch0[i] + ch1[i]) / 2; }
-  if (dec.duration < 0.5 || peakOf(mono) < 0.0005) throw new Error("empty");
-  return {wav: encodeWav(normalize(downsample(mono, dec.sampleRate, TARGET_RATE)), TARGET_RATE), peak: peakOf(mono)};
-}
-
 function cleanupAudio(){
   try { source && source.disconnect(); } catch(_){}
   try { node && node.disconnect(); } catch(_){}
@@ -325,36 +263,20 @@ function cleanupAudio(){
   audioCtx = stream = source = node = mute = null;
 }
 
-async function stopRec(){
-  const i = recIndex, s = state[i];
+function stopRec(){
+  const s = state[recIndex];
   if (!s || s.phase !== "recording") return;
   clearInterval(tick);
-  s.phase = "uploading"; s.warn = ""; render();        // 처리하는 동안 버튼 잠금
-  const original = await stopRecorder();
   cleanupAudio();
   const merged = mergePcm(pcm); pcm = [];
-
-  // 1순위: 내장 녹음기 원본 (끊김 없음)  2순위: 직접 받은 소리
-  let wav = null, playUrl = null, peak = 0;
-  if (original && original.size > 1000){
-    try {
-      const r = await blobToWav(original);
-      wav = r.wav; peak = r.peak;
-      playUrl = URL.createObjectURL(original);
-    } catch(_){}
+  if (merged.length < inRate * 0.5){                   // 0.5초도 안 녹음됨
+    s.phase = "idle"; render();
+    toast("녹음된 소리가 없어요. 마이크를 확인하고 다시 녹음해 주세요."); return;
   }
-  if (!wav){
-    if (merged.length < inRate * 0.5){
-      s.phase = "idle"; render();
-      toast("녹음된 소리가 없어요. 마이크를 확인하고 다시 녹음해 주세요."); return;
-    }
-    peak = peakOf(merged);
-    wav = encodeWav(normalize(downsample(merged, inRate, TARGET_RATE)), TARGET_RATE);
-  }
-  if (peak < 0.002) toast("소리가 아주 작게 녹음됐어요. 폰을 입 가까이 대고 다시 녹음해 보세요.");
-  s.wav = wav;
-  s.url = playUrl || URL.createObjectURL(wav);
-  upload(i);
+  if (peakOf(merged) < 0.002) toast("소리가 아주 작게 녹음됐어요. 폰을 입 가까이 대고 다시 녹음해 보세요.");
+  s.wav = encodeWav(normalize(downsample(merged, inRate, TARGET_RATE)), TARGET_RATE);
+  s.url = URL.createObjectURL(s.wav);
+  upload(recIndex);
 }
 
 function mergePcm(chunks){
@@ -409,9 +331,8 @@ function blobToBase64(blob){
 }
 async function api(payload){
   const res = await fetch(API_URL, {method:"POST", headers:{"Content-Type":"text/plain;charset=utf-8"}, body:JSON.stringify(payload)});
-  let j;
-  try { j = await res.json(); } catch(_){ throw new Error("서버 응답을 읽지 못했어요. 선생님께 알려주세요. (배포 권한 확인 필요)"); }
-  if (!j.ok){ const e = new Error(j.error || "서버 오류"); e.server = true; throw e; }
+  const j = await res.json();
+  if (!j.ok) throw new Error(j.error || "서버 오류");
   return j;
 }
 
@@ -420,18 +341,18 @@ async function upload(i){
   s.phase = "uploading"; s.warn = ""; render();
   try {
     const j = await api({
-      app:"hw", code, action:"answer", sid, name:$("studentName").value.trim(), q:i + 1,
+      app:"hw2", action:"answer", sid, name:$("studentName").value.trim(), q:i + 1,
       qType:QUESTIONS[i].label || QUESTIONS[i].type, qText:QUESTIONS[i].text, seconds:s.seconds,
       data: await blobToBase64(s.wav)
     });
     s.transcript = j.transcript || "";
     s.ev = j.evaluation || null;
-    s.evErr = j.evaluation ? "" : (j.evalError || "서버가 평가를 보내지 않았어요");
+    s.evErr = j.evaluation ? "" : (j.evalError || "");
     s.warn = j.warn || "";
     s.phase = "ready";
   } catch(e){
     s.phase = "error";
-    s.warn = /코드|사용기한|사용할 수 없/.test(e.message) ? e.message : "전송에 실패했어요. 인터넷 연결을 확인하고 ‘다시 보내기’를 눌러주세요.";
+    s.warn = /사용기한|사용할 수 없/.test(e.message) ? e.message : "전송에 실패했어요. 인터넷 연결을 확인하고 ‘다시 보내기’를 눌러주세요.";
   }
   render();
 }
@@ -543,28 +464,7 @@ function evalHtml(ev){
   return h + `</div>`;
 }
 
-function renderSets(){
-  const nav = $("sets"); nav.innerHTML = "";
-  SETS.forEach((st, i) => {
-    const b = document.createElement("button");
-    b.className = "setbtn" + (store[i].link ? " sent" : "");
-    b.textContent = st.name; b.setAttribute("aria-pressed", i === setIdx);
-    b.disabled = busy() && i !== setIdx;
-    b.onclick = () => switchSet(i);
-    nav.appendChild(b);
-  });
-}
-function switchSet(i){
-  if (i === setIdx || busy()) return;
-  if ("speechSynthesis" in window) speechSynthesis.cancel(); speaking = false;
-  store[setIdx].cur = cur;
-  setIdx = i; QUESTIONS = SETS[i].qs; state = store[i].state; sid = store[i].sid; cur = store[i].cur;
-  const sb = $("submitBtn"); delete sb.dataset.sure; sb.textContent = store[i].link ? "다시 제출하기" : "제출하고 링크 받기";
-  $("linkBox").textContent = store[i].link; $("linkArea").hidden = !store[i].link;
-  render();
-}
-
-function render(){ renderSets(); renderTabs(); renderCard(); renderSubmit(); }
+function render(){ renderTabs(); renderCard(); renderSubmit(); }
 
 /* ---------- 제출 ---------- */
 async function submitAll(){
@@ -579,8 +479,8 @@ async function submitAll(){
   const btn = $("submitBtn");
   btn.disabled = true; btn.textContent = "제출 중…";
   try {
-    const j = await api({app:"hw", code, action:"finalize", sid, name:$("studentName").value.trim(), qs});
-    $("linkBox").textContent = j.link; store[setIdx].link = j.link;
+    const j = await api({app:"hw2", action:"finalize", sid, name:$("studentName").value.trim(), qs});
+    $("linkBox").textContent = j.link;
     $("linkArea").hidden = false;
     btn.textContent = "다시 제출하기";
     toast("제출 완료! 링크를 복사해서 보내주세요.");
@@ -605,34 +505,22 @@ let toastTimer;
 function toast(m){ const t = $("toast"); t.textContent = m; t.hidden = false; clearTimeout(toastTimer); toastTimer = setTimeout(() => t.hidden = true, 3000); }
 
 $("submitBtn").onclick = submitAll;
-$("copyLinkBtn").onclick = () => copyText(`[클레오픽 숙제] ${$("studentName").value.trim()} · ${SETS[setIdx].name}\n${$("linkBox").textContent}`, "링크를 복사했어요. 카톡에 붙여넣어 보내세요.");
+$("copyLinkBtn").onclick = () => copyText(`[클레오픽 숙제] ${$("studentName").value.trim()}\n${$("linkBox").textContent}`, "링크를 복사했어요. 카톡에 붙여넣어 보내세요.");
 $("configWarn").hidden = configured;
 try { $("studentName").value = localStorage.getItem("cleopic_name") || ""; } catch(_){}
 $("studentName").addEventListener("input", e => { try { localStorage.setItem("cleopic_name", e.target.value); } catch(_){} });
-window.addEventListener("beforeunload", e => { if (store.some(st => !st.link && st.state.some(s => s.wav))){ e.preventDefault(); e.returnValue = ""; } });
-
-/* ---------- 입장 (수강 코드 · 사용기한) ---------- */
-try { $("accessCode").value = localStorage.getItem("cleopic_code") || ""; } catch(_){}
-async function enter(){
-  const n = $("studentName").value.trim(), c = $("accessCode").value.trim().toUpperCase();
-  const err = $("enterErr"); err.hidden = true;
-  if (!n){ err.textContent = "이름을 입력해 주세요."; err.hidden = false; $("studentName").focus(); return; }
-  if (!c){ err.textContent = "수강 코드를 입력해 주세요."; err.hidden = false; $("accessCode").focus(); return; }
-  const b = $("enterBtn"); b.disabled = true; b.textContent = "확인 중…";
-  try {
-    const j = await api({action:"check", code:c});
-    code = c; try { localStorage.setItem("cleopic_code", c); } catch(_){}
-    $("codeRow").hidden = true;
-    $("untilLine").textContent = `${j.until}까지 사용할 수 있어요`; $("untilLine").hidden = false;
-    $("main").hidden = false; render();
-  } catch(e){
-    err.textContent = (e.server || /서버 응답/.test(e.message)) ? e.message : "연결에 실패했어요. 인터넷을 확인하고 다시 눌러주세요. (" + (e.message || "network") + ")"; err.hidden = false;
-  }
-  b.disabled = false; b.textContent = "입장";
-}
-$("enterBtn").onclick = enter;
-$("accessCode").addEventListener("keydown", e => { if (e.key === "Enter") enter(); });
+window.addEventListener("beforeunload", e => { if (state.some(s => s.wav) && $("linkArea").hidden){ e.preventDefault(); e.returnValue = ""; } });
+let expired = "";
 render();
+(async () => {   // 사용기한 확인 (코드 입력 없음)
+  if (!configured) return;
+  try {
+    const j = await api({action:"window"});
+    $("untilLine").textContent = `${j.until}까지 제출할 수 있어요`; $("untilLine").hidden = false;
+  } catch(e){
+    if (/사용기한|사용할 수 없|설정/.test(e.message)){ expired = e.message; $("expiredBar").textContent = e.message; $("expiredBar").hidden = false; }
+  }
+})();
 </script>
 </body>
 </html>
