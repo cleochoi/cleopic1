@@ -236,7 +236,7 @@ async function startRec(){
 
   audioCtx = new AC();                                  // 버튼 누른 순간에 만들어야 아이폰에서도 작동
   try {
-    stream = await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true, noiseSuppression:true, autoGainControl:true}});
+    stream = await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true, noiseSuppression:false, autoGainControl:true}});
   } catch(e){
     audioCtx.close(); audioCtx = null;
     toast("마이크를 쓸 수 없어요. 마이크 권한을 허용해 주세요. (" + (e && e.name || "오류") + ")"); return;
@@ -261,6 +261,16 @@ async function startRec(){
     }
     mute = audioCtx.createGain(); mute.gain.value = 0;   // 스피커로는 안 나가게
     source.connect(node); node.connect(mute); mute.connect(audioCtx.destination);
+    // 폰 내장 녹음기로도 같이 녹음 (끊김 없는 원본 · 다시 듣기와 제출에 우선 사용)
+    mrChunks = []; mr = null;
+    if (window.MediaRecorder){
+      try {
+        const mt = ["audio/webm;codecs=opus", "audio/mp4", "audio/webm", "audio/ogg"].find(t => MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(t));
+        mr = new MediaRecorder(stream, mt ? {mimeType:mt} : undefined);
+        mr.ondataavailable = e => { if (e.data && e.data.size) mrChunks.push(e.data); };
+        mr.start(1000);
+      } catch(_){ mr = null; }
+    }
   } catch(e){
     cleanupAudio();
     toast("녹음을 시작하지 못했어요. 페이지를 새로고침해 주세요. (" + (e && e.name || "오류") + ")"); return;
@@ -281,6 +291,30 @@ async function startRec(){
   render();
 }
 
+let mr = null, mrChunks = [];
+function stopRecorder(){
+  return new Promise(ok => {
+    if (!mr || mr.state === "inactive") return ok(null);
+    const t = setTimeout(() => ok(null), 3000);
+    mr.onstop = () => { clearTimeout(t); ok(new Blob(mrChunks, {type: mr.mimeType || (mrChunks[0] && mrChunks[0].type) || "audio/webm"})); };
+    try { mr.stop(); } catch(_){ clearTimeout(t); ok(null); }
+  });
+}
+// 내장 녹음기 파일 → 16kHz 모노 WAV (서버로 보낼 용도)
+async function blobToWav(blob){
+  const AC = window.AudioContext || window.webkitAudioContext, ctx = new AC();
+  let dec;
+  try {
+    const buf = await blob.arrayBuffer();
+    dec = await new Promise((ok, fail) => { const p = ctx.decodeAudioData(buf, ok, fail); if (p && p.then) p.then(ok, fail); });
+  } finally { try { ctx.close(); } catch(_){} }
+  const ch0 = dec.getChannelData(0);
+  let mono = ch0;
+  if (dec.numberOfChannels > 1){ const ch1 = dec.getChannelData(1); mono = new Float32Array(ch0.length); for (let i = 0; i < ch0.length; i++) mono[i] = (ch0[i] + ch1[i]) / 2; }
+  if (dec.duration < 0.5 || peakOf(mono) < 0.0005) throw new Error("empty");
+  return {wav: encodeWav(normalize(downsample(mono, dec.sampleRate, TARGET_RATE)), TARGET_RATE), peak: peakOf(mono)};
+}
+
 function cleanupAudio(){
   try { source && source.disconnect(); } catch(_){}
   try { node && node.disconnect(); } catch(_){}
@@ -291,20 +325,36 @@ function cleanupAudio(){
   audioCtx = stream = source = node = mute = null;
 }
 
-function stopRec(){
-  const s = state[recIndex];
+async function stopRec(){
+  const i = recIndex, s = state[i];
   if (!s || s.phase !== "recording") return;
   clearInterval(tick);
+  s.phase = "uploading"; s.warn = ""; render();        // 처리하는 동안 버튼 잠금
+  const original = await stopRecorder();
   cleanupAudio();
   const merged = mergePcm(pcm); pcm = [];
-  if (merged.length < inRate * 0.5){                   // 0.5초도 안 녹음됨
-    s.phase = "idle"; render();
-    toast("녹음된 소리가 없어요. 마이크를 확인하고 다시 녹음해 주세요."); return;
+
+  // 1순위: 내장 녹음기 원본 (끊김 없음)  2순위: 직접 받은 소리
+  let wav = null, playUrl = null, peak = 0;
+  if (original && original.size > 1000){
+    try {
+      const r = await blobToWav(original);
+      wav = r.wav; peak = r.peak;
+      playUrl = URL.createObjectURL(original);
+    } catch(_){}
   }
-  if (peakOf(merged) < 0.002) toast("소리가 아주 작게 녹음됐어요. 폰을 입 가까이 대고 다시 녹음해 보세요.");
-  s.wav = encodeWav(normalize(downsample(merged, inRate, TARGET_RATE)), TARGET_RATE);
-  s.url = URL.createObjectURL(s.wav);
-  upload(recIndex);
+  if (!wav){
+    if (merged.length < inRate * 0.5){
+      s.phase = "idle"; render();
+      toast("녹음된 소리가 없어요. 마이크를 확인하고 다시 녹음해 주세요."); return;
+    }
+    peak = peakOf(merged);
+    wav = encodeWav(normalize(downsample(merged, inRate, TARGET_RATE)), TARGET_RATE);
+  }
+  if (peak < 0.002) toast("소리가 아주 작게 녹음됐어요. 폰을 입 가까이 대고 다시 녹음해 보세요.");
+  s.wav = wav;
+  s.url = playUrl || URL.createObjectURL(wav);
+  upload(i);
 }
 
 function mergePcm(chunks){
