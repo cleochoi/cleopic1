@@ -268,7 +268,7 @@ async function startRec(){
 
   const s = state[cur];
   if (s.url) URL.revokeObjectURL(s.url);
-  Object.assign(s, {phase:"recording", wav:null, url:null, transcript:"", warn:"", ev:null, seconds:0, done:false});
+  Object.assign(s, {phase:"recording", wav:null, url:null, transcript:"", warn:"", ev:null, evErr:"", seconds:0, done:false});
   recIndex = cur;
   $("studentName").readOnly = true;                    // 같은 학생 폴더로 저장되도록 이름 고정
   startAt = Date.now();
@@ -376,6 +376,7 @@ async function upload(i){
     });
     s.transcript = j.transcript || "";
     s.ev = j.evaluation || null;
+    s.evErr = j.evaluation ? "" : (j.evalError || "서버가 평가를 보내지 않았어요");
     s.warn = j.warn || "";
     s.phase = "ready";
   } catch(e){
@@ -457,7 +458,7 @@ function renderCard(){
       <h3>3. 들어보고 결정하기</h3>
       <audio controls src="${s.url}"></audio>
       ${tBox}
-      ${s.ev ? evalHtml(s.ev) : ""}
+      ${s.ev ? evalHtml(s.ev) : (s.phase === "ready" && s.evErr ? `<p class="hint">AI 평가를 만들지 못했어요. (${esc(s.evErr)})</p>` : "")}
       ${s.warn ? `<p class="err">${esc(s.warn)}</p>` : ""}
       <div class="row">
         <button class="btn" id="copyTBtn" ${s.transcript ? "" : "disabled"}>스크립트 복사</button>
