@@ -36,7 +36,11 @@ header{display:flex;flex-direction:column;gap:4px}
 .name label{font-weight:700;white-space:nowrap;font-size:.9rem}
 .name input{flex:1;min-width:0;border:0;background:transparent;color:var(--ink);font:inherit;outline:none}
 .name input[readonly]{color:var(--muted)}
-.tabs{display:grid;grid-template-columns:repeat(5,1fr);gap:6px}
+.tabs{display:grid;grid-template-columns:repeat(var(--cols,5),1fr);gap:6px}
+.chooser{display:flex;flex-direction:column;gap:10px}
+.chooser a{display:flex;align-items:center;gap:12px;text-decoration:none;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px 16px;font-weight:700}
+.chooser a b{font-family:var(--mono);color:var(--accent);font-size:.9rem}
+.chooser a:hover{border-color:var(--accent)}
 .tab{border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:10px;padding:8px 0;font:inherit;cursor:pointer;display:flex;flex-direction:column;align-items:center;line-height:1.2}
 .tab b{font-family:var(--mono);font-size:.95rem}
 .tab span{font-size:.72rem;color:var(--muted)}
@@ -79,7 +83,7 @@ audio{width:100%}
 <div class="wrap">
   <header>
     <h1 class="brand">클레오픽<small>CleoPIc</small></h1>
-    <p class="sub">묘사 · 루틴 5문항 녹음 숙제. 질문을 듣고 영어로 답변하세요.</p>
+    <p class="sub" id="subText">롤플레이 녹음 숙제. 질문을 듣고 영어로 답변하세요.</p>
   </header>
 
   <div class="warnbar" id="configWarn" hidden>선생님 설정이 아직 안 됐어요. index.html의 API_URL에 웹 앱 주소를 넣어주세요.</div>
@@ -110,13 +114,39 @@ audio{width:100%}
 /* ===== 선생님 설정 ===== */
 const API_URL = "https://script.google.com/macros/s/AKfycbwKznD-iw20x4tDb2LKAv-cgoJEvTWt1bGat-k70oQodISMQLXJveL4Gcpe_FLt7w4j/exec";   // 예: https://script.google.com/macros/s/AKfy.../exec
 
-const QUESTIONS = [
-  {type:"묘사", label:"묘사 · 집 · 우리 집 소개", text:"Tell me about the home you live in. What does it look like? How many rooms does it have? Which room is your favorite, and why? Please describe your home in as much detail as possible."},
-  {type:"묘사", label:"묘사 · 동네 · 우리 동네", text:"Describe the neighborhood you live in. What does it look like, and what kinds of buildings or places are there? What do you like most about your neighborhood? Please tell me in detail."},
-  {type:"루틴", label:"루틴 · 음악 감상 · 음악 듣는 습관", text:"When and where do you usually listen to music? How do you listen to it, for example on your phone or with speakers? What kind of music do you usually listen to? Tell me about your music listening routine in detail."},
-  {type:"루틴", label:"루틴 · 영화보기 · 영화 보는 날", text:"Tell me about what you usually do when you go to the movies. Who do you usually go with? What do you do before and after the movie? Please describe a typical day when you go to see a movie, from beginning to end."},
-  {type:"묘사", label:"묘사 · 공원 · 자주 가는 공원", text:"Tell me about a park you often go to. Where is it, and what does it look like? What kinds of things do people usually do there? Please describe the park in as much detail as possible."}
+/* 롤플레이 세트: 링크 끝에 ?set=1 ~ ?set=5 를 붙이면 그 세트로 바로 열려요.
+   세트를 추가하려면 { title:"...", qs:[ "11번 질문", "12번 질문", "13번 질문" ] } 블록을 하나 더 넣으면 돼요. */
+const SETS = [
+  {title:"헬스장 등록", qs:[
+    "You want to sign up for a new gym. Call the gym and ask three or four questions about its membership, facilities, and operating hours.",
+    "You just found out that the gym is closed during the hours you usually work out. Call the gym, explain the problem, and suggest a solution.",
+    "Have you ever had a problem with a gym, sports club, or class? What happened, and how did you deal with it?"
+  ]},
+  {title:"공연 티켓", qs:[
+    "Your friend is going to a concert. Call your friend and ask three or four questions about the concert, such as the date, venue, and ticket price.",
+    "You can no longer attend because something unexpected came up. Call your friend, explain the situation, and suggest what to do with your ticket.",
+    "Tell me about a time when you had to cancel or change plans for an event. What happened?"
+  ]},
+  {title:"스마트폰 구매", qs:[
+    "You want to buy a new smartphone. Call an electronics store and ask three or four questions about the models, prices, and available features.",
+    "After buying the phone, you discover that it has a problem. Call the store, explain the issue, and ask them to help you resolve it.",
+    "Have you ever bought something that didn't work properly? Describe what happened and how you handled it."
+  ]},
+  {title:"여행 숙소 예약", qs:[
+    "You are planning a trip and want to book a hotel. Call the hotel and ask three or four questions about the room, location, and services.",
+    "The hotel tells you that your reservation cannot be found when you arrive. Talk to the front desk, explain the situation, and work out a solution.",
+    "Tell me about a time when something went wrong during a trip. What was the problem, and what did you do?"
+  ]},
+  {title:"친구에게 물건 빌리기", qs:[
+    "You want to borrow a camera from your friend for a weekend trip. Call your friend and ask three or four questions about the camera and when you can pick it up.",
+    "You accidentally damage the camera. Call your friend, explain what happened, and suggest how you will make it right.",
+    "Have you ever borrowed or lent something that got lost or damaged? Tell me what happened."
+  ]}
 ];
+const ROLE_TYPES = [{no:11, type:"질문하기"}, {no:12, type:"문제해결"}, {no:13, type:"관련경험"}];
+const setNo = parseInt(new URLSearchParams(location.search).get("set"), 10);
+const SET = SETS[setNo - 1] || null;
+const QUESTIONS = SET ? SET.qs.map((text, i) => ({no:ROLE_TYPES[i].no, type:ROLE_TYPES[i].type, label:SET.title + " · " + ROLE_TYPES[i].no + "번 " + ROLE_TYPES[i].type, text})) : [];
 const MAX_REPLAYS = 2;       // 첫 듣기 이후 다시 듣기 횟수
 const MAX_SECONDS = 180;     // 녹음 최대 3분
 const TARGET_RATE = 16000;   // 저장 음질 (16kHz 모노 WAV)
@@ -341,7 +371,7 @@ function confirmAnswer(){
   const next = state.findIndex(x => !x.done);
   if (next !== -1) cur = next;
   render();
-  toast(next === -1 ? QUESTIONS.length + "문항 모두 완료! 아래에서 제출하세요." : "담았어요. Q" + (next + 1) + "로 넘어갑니다.");
+  toast(next === -1 ? QUESTIONS.length + "문항 모두 완료! 아래에서 제출하세요." : "담았어요. Q" + QUESTIONS[next].no + "로 넘어갑니다.");
 }
 
 /* ---------- 화면 ---------- */
@@ -355,7 +385,7 @@ function renderTabs(){
     b.className = "tab" + (state[i].done ? " done" : "");
     b.setAttribute("role", "tab"); b.setAttribute("aria-selected", i === cur);
     b.disabled = busy();
-    b.innerHTML = `<b>Q${i + 1}</b><span>${state[i].done ? "완료" : q.type}</span>`;
+    b.innerHTML = `<b>Q${q.no}</b><span>${state[i].done ? "완료" : q.type}</span>`;
     b.onclick = () => { if (!busy()){ if ("speechSynthesis" in window) speechSynthesis.cancel(); speaking = false; cur = i; render(); } };
     nav.appendChild(b);
   });
@@ -386,7 +416,7 @@ function renderCard(){
   const showReview = s.wav && (s.phase === "ready" || s.phase === "error" || s.phase === "uploading");
 
   card.innerHTML = `
-    <div class="qhead"><span class="chip">${esc(q.label || q.type)}</span><span class="qnum">QUESTION ${cur + 1} / ${QUESTIONS.length}</span></div>
+    <div class="qhead"><span class="chip">${esc(q.label || q.type)}</span><span class="qnum">QUESTION ${q.no}</span></div>
 
     <div class="step">
       <h3>1. 질문 듣기 · 미국식 발음</h3>
@@ -474,7 +504,20 @@ $("configWarn").hidden = configured;
 try { $("studentName").value = localStorage.getItem("cleopic_name") || ""; } catch(_){}
 $("studentName").addEventListener("input", e => { try { localStorage.setItem("cleopic_name", e.target.value); } catch(_){} });
 window.addEventListener("beforeunload", e => { if (state.some(s => s.wav) && $("linkArea").hidden){ e.preventDefault(); e.returnValue = ""; } });
-render();
+if (SET){
+  document.title = "클레오픽 · " + SET.title;
+  $("subText").textContent = SET.title + " · 롤플레이 " + QUESTIONS.length + "문항 녹음 숙제. 질문을 듣고 영어로 답변하세요.";
+  $("tabs").style.setProperty("--cols", QUESTIONS.length);
+  render();
+} else {
+  // 세트를 고르지 않고 들어오면 세트 목록을 보여줌
+  ["configWarn"].forEach(id => $(id).hidden = true);
+  [document.querySelector(".name"), $("tabs"), $("card"), document.querySelector(".submit")].forEach(el => el.style.display = "none");
+  $("subText").textContent = "오늘 숙제 세트를 골라주세요.";
+  const box = document.createElement("nav"); box.className = "chooser";
+  box.innerHTML = SETS.map((st, i) => `<a href="?set=${i + 1}"><b>SET ${i + 1}</b><span>${esc(st.title)}</span></a>`).join("");
+  document.querySelector(".wrap").appendChild(box);
+}
 </script>
 </body>
 </html>
