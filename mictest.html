@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>클레오픽 마이크 테스트</title>
+<style>
+:root{--bg:#eef1f0;--surface:#fff;--ink:#18242a;--muted:#5b6a6f;--line:#d3dbda;--accent:#1f5f6b;--soft:#e1ebe9;--rec:#d23f38}
+@media (prefers-color-scheme:dark){:root{--bg:#11191c;--surface:#19252a;--ink:#e5eeed;--muted:#97a7aa;--line:#2b3a3f;--accent:#72bcc7;--soft:#1f323a;--rec:#ff6a61}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Apple SD Gothic Neo","Malgun Gothic",sans-serif;line-height:1.6;padding:20px 16px 40px}
+main{max-width:560px;margin:0 auto;display:flex;flex-direction:column;gap:14px}
+h1{margin:0;font-size:1.6rem}p{margin:0}.muted{color:var(--muted);font-size:.9rem}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:16px;display:flex;flex-direction:column;gap:10px}
+.card h2{margin:0;font-size:1.1rem}.tag{display:inline-block;background:var(--accent);color:#fff;border-radius:6px;padding:0 8px;margin-right:6px;font-size:.9rem}
+button{font:inherit;font-weight:700;padding:10px 14px;border-radius:10px;border:1px solid var(--rec);background:var(--rec);color:#fff;cursor:pointer;align-self:flex-start}
+button:disabled{opacity:.45}
+audio{width:100%}.lbl{font-size:.8rem;font-weight:700;color:var(--muted)}
+.info{font-family:ui-monospace,Menlo,monospace;font-size:.75rem;color:var(--muted);overflow-wrap:anywhere}
+</style>
+</head>
+<body>
+<main>
+  <h1>마이크 테스트</h1>
+  <p class="muted">세 가지 방식으로 각각 <b>10초</b>씩 녹음해요. 같은 문장(예: 영어 자기소개)을 똑같이 말하고, 어느 것이 <b>끊기지 않고 또렷한지</b> 들어보세요. 각 칸의 <b>원본</b>과 <b>변환본</b>도 둘 다 들어봐 주세요.</p>
+  <div id="list"></div>
+</main>
+<script>
+const MODES = [
+  {id:"A", name:"폰 기본 설정", c:{audio:true}},
+  {id:"B", name:"소리 보정 모두 끔", c:{audio:{echoCancellation:false, noiseSuppression:false, autoGainControl:false}}},
+  {id:"C", name:"자동 볼륨만 켬", c:{audio:{echoCancellation:false, noiseSuppression:false, autoGainControl:true}}}
+];
+const SECONDS = 10, RATE = 16000;
+let busy = false;
+
+MODES.forEach(m => {
+  const d = document.createElement("section"); d.className = "card"; d.id = "m" + m.id;
+  d.innerHTML = `<h2><span class="tag">${m.id}</span>${m.name}</h2>
+    <button>● 10초 녹음</button><div class="out"></div>`;
+  d.querySelector("button").onclick = () => run(m, d);
+  document.getElementById("list").appendChild(d);
+});
+
+async function run(m, d){
+  if (busy) return; busy = true;
+  const btn = d.querySelector("button"), out = d.querySelector(".out");
+  document.querySelectorAll("button").forEach(b => b.disabled = true);
+  out.innerHTML = "";
+  let stream;
+  try { stream = await navigator.mediaDevices.getUserMedia(m.c); }
+  catch(e){ out.innerHTML = `<p class="muted">마이크 오류: ${e.name}</p>`; done(); return; }
+  const track = stream.getAudioTracks()[0];
+  const st = track.getSettings ? track.getSettings() : {};
+  const settings = `에코제거 ${st.echoCancellation} · 잡음제거 ${st.noiseSuppression} · 자동볼륨 ${st.autoGainControl} · ${st.sampleRate || "?"}Hz`;
+  const mime = ["audio/webm;codecs=opus","audio/mp4","audio/webm"].find(t => MediaRecorder.isTypeSupported(t));
+  const rec = mime ? new MediaRecorder(stream, {mimeType:mime}) : new MediaRecorder(stream);
+  const chunks = []; let ended = false;
+  track.onended = () => { ended = true; };
+  rec.ondataavailable = e => { if (e.data.size) chunks.push(e.data); };
+  rec.onstop = async () => {
+    stream.getTracks().forEach(t => t.stop());
+    const blob = new Blob(chunks, {type: rec.mimeType || "audio/webm"});
+    let html = `<div class="lbl">원본</div><audio controls src="${URL.createObjectURL(blob)}"></audio>`;
+    try {
+      const wav = await toWav(blob);
+      html += `<div class="lbl">변환본 (서버로 보내는 파일)</div><audio controls src="${URL.createObjectURL(wav.blob)}"></audio>
+        <p class="info">볼륨 ${wav.peak.toFixed(3)} · 길이 ${wav.sec.toFixed(1)}초</p>`;
+    } catch(e){ html += `<p class="muted">변환 오류: ${e.name || e}</p>`; }
+    html += `<p class="info">${ended ? "⚠ 녹음 중 마이크 끊김 · " : ""}${rec.mimeType} · ${settings}</p>`;
+    out.innerHTML = html; done();
+  };
+  rec.start(1000);
+  let left = SECONDS; btn.textContent = `녹음 중… ${left}`;
+  const t = setInterval(() => { left--; btn.textContent = `녹음 중… ${left}`; if (left <= 0){ clearInterval(t); rec.stop(); } }, 1000);
+  function done(){ busy = false; btn.textContent = "● 다시 10초 녹음"; document.querySelectorAll("button").forEach(b => b.disabled = false); }
+}
+
+async function toWav(blob){
+  const ctx = new (window.AudioContext || window.webkitAudioContext)();
+  const dec = await new Promise(async (ok, no) => { const buf = await blob.arrayBuffer(); const p = ctx.decodeAudioData(buf, ok, no); if (p && p.then) p.then(ok, no); });
+  ctx.close();
+  const x = dec.getChannelData(0), ratio = dec.sampleRate / RATE, n = Math.floor(x.length / ratio), y = new Float32Array(n);
+  for (let i = 0; i < n; i++){ const a = Math.floor(i * ratio), b = Math.min(x.length, Math.floor((i + 1) * ratio)); let s = 0; for (let j = a; j < b; j++) s += x[j]; y[i] = s / Math.max(1, b - a); }
+  let peak = 0; for (let i = 0; i < n; i++) peak = Math.max(peak, Math.abs(y[i]));
+  const g = peak > 0.0005 && peak < 0.85 ? Math.min(20, 0.85 / peak) : 1;
+  const buf = new ArrayBuffer(44 + n * 2), v = new DataView(buf), w = (o, s) => { for (let i = 0; i < s.length; i++) v.setUint8(o + i, s.charCodeAt(i)); };
+  w(0,"RIFF"); v.setUint32(4,36+n*2,true); w(8,"WAVE"); w(12,"fmt "); v.setUint32(16,16,true); v.setUint16(20,1,true); v.setUint16(22,1,true);
+  v.setUint32(24,RATE,true); v.setUint32(28,RATE*2,true); v.setUint16(32,2,true); v.setUint16(34,16,true); w(36,"data"); v.setUint32(40,n*2,true);
+  for (let i = 0; i < n; i++){ const s = Math.max(-1, Math.min(1, y[i] * g)); v.setInt16(44 + i * 2, s < 0 ? s * 0x8000 : s * 0x7FFF, true); }
+  return {blob:new Blob([buf], {type:"audio/wav"}), peak, sec:n / RATE};
+}
+</script>
+</body>
+</html>
