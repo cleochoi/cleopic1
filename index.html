@@ -236,7 +236,7 @@ async function startRec(){
 
   audioCtx = new AC();                                  // 버튼 누른 순간에 만들어야 아이폰에서도 작동
   try {
-    stream = await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:false, noiseSuppression:false, autoGainControl:true}});
+    stream = await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true, noiseSuppression:true, autoGainControl:true}});
   } catch(e){
     audioCtx.close(); audioCtx = null;
     toast("마이크를 쓸 수 없어요. 마이크 권한을 허용해 주세요. (" + (e && e.name || "오류") + ")"); return;
