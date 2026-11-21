@@ -37,10 +37,16 @@ header{display:flex;flex-direction:column;gap:4px}
 .name input{flex:1;min-width:0;border:0;background:transparent;color:var(--ink);font:inherit;outline:none}
 .name input[readonly]{color:var(--muted)}
 .tabs{display:grid;grid-template-columns:repeat(var(--cols,5),1fr);gap:6px}
-.chooser{display:flex;flex-direction:column;gap:10px}
-.chooser a{display:flex;align-items:center;gap:12px;text-decoration:none;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px 16px;font-weight:700}
-.chooser a b{font-family:var(--mono);color:var(--accent);font-size:.9rem}
-.chooser a:hover{border-color:var(--accent)}
+.days{display:grid;grid-template-columns:repeat(5,1fr);gap:6px}
+.day{border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:12px;padding:8px 2px;font:inherit;cursor:pointer;display:flex;flex-direction:column;align-items:center;line-height:1.25;min-width:0}
+.day b{font-family:var(--display);font-weight:400;font-size:1.25rem}
+.day span{font-size:.68rem;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%;padding:0 4px}
+.day[aria-selected="true"]{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.day[aria-selected="true"] span{color:var(--accent-ink)}
+.day.sent span{color:var(--ok);font-weight:700}.day[aria-selected="true"].sent span{color:var(--accent-ink)}
+.day:disabled{opacity:.5;cursor:not-allowed}
+.daytitle{font-family:var(--display);font-size:1.35rem;margin:0}
+.linkbtn{background:none;border:0;padding:0;font:inherit;font-size:.85rem;color:var(--muted);text-decoration:underline;cursor:pointer;align-self:flex-start}
 .tab{border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:10px;padding:8px 0;font:inherit;cursor:pointer;display:flex;flex-direction:column;align-items:center;line-height:1.2}
 .tab b{font-family:var(--mono);font-size:.95rem}
 .tab span{font-size:.72rem;color:var(--muted)}
@@ -94,10 +100,12 @@ audio{width:100%}
 <div class="wrap">
   <header>
     <h1 class="brand">클레오픽<small>CleoPIc</small></h1>
-    <p class="sub" id="subText">롤플레이 녹음 숙제. 질문을 듣고 영어로 답변하세요.</p>
+    <p class="sub" id="subText">롤플레이 녹음 숙제. 하루에 한 세트(3문항)씩 녹음해서 제출하세요.</p>
   </header>
 
   <div class="warnbar" id="configWarn" hidden>선생님 설정이 아직 안 됐어요. index.html의 API_URL에 웹 앱 주소를 넣어주세요.</div>
+
+  <nav class="days" id="days"></nav>
 
   <div class="name">
     <label for="studentName">이름</label>
@@ -125,39 +133,36 @@ audio{width:100%}
 /* ===== 선생님 설정 ===== */
 const API_URL = "https://script.google.com/macros/s/AKfycbwKznD-iw20x4tDb2LKAv-cgoJEvTWt1bGat-k70oQodISMQLXJveL4Gcpe_FLt7w4j/exec";   // 예: https://script.google.com/macros/s/AKfy.../exec
 
-/* 롤플레이 세트: 링크 끝에 ?set=1 ~ ?set=5 를 붙이면 그 세트로 바로 열려요.
-   세트를 추가하려면 { title:"...", qs:[ "11번 질문", "12번 질문", "13번 질문" ] } 블록을 하나 더 넣으면 돼요. */
-const SETS = [
-  {title:"헬스장 등록", qs:[
-    "You want to sign up for a new gym. Call the gym and ask three or four questions about its membership, facilities, and operating hours.",
-    "You just found out that the gym is closed during the hours you usually work out. Call the gym, explain the problem, and suggest a solution.",
-    "Have you ever had a problem with a gym, sports club, or class? What happened, and how did you deal with it?"
-  ]},
-  {title:"공연 티켓", qs:[
-    "Your friend is going to a concert. Call your friend and ask three or four questions about the concert, such as the date, venue, and ticket price.",
-    "You can no longer attend because something unexpected came up. Call your friend, explain the situation, and suggest what to do with your ticket.",
-    "Tell me about a time when you had to cancel or change plans for an event. What happened?"
-  ]},
-  {title:"스마트폰 구매", qs:[
-    "You want to buy a new smartphone. Call an electronics store and ask three or four questions about the models, prices, and available features.",
-    "After buying the phone, you discover that it has a problem. Call the store, explain the issue, and ask them to help you resolve it.",
-    "Have you ever bought something that didn't work properly? Describe what happened and how you handled it."
-  ]},
-  {title:"여행 숙소 예약", qs:[
+/* 요일별 세트: 하루에 한 세트(11·12·13번)를 녹음해서 제출해요.
+   주제를 바꾸려면 title과 qs 안의 영어 질문만 바꾸면 돼요. (질문 안에 큰따옴표 " 는 쓰지 마세요) */
+const DAYS = [
+  {day:"월", title:"호텔 예약", qs:[
     "You are planning a trip and want to book a hotel. Call the hotel and ask three or four questions about the room, location, and services.",
     "The hotel tells you that your reservation cannot be found when you arrive. Talk to the front desk, explain the situation, and work out a solution.",
     "Tell me about a time when something went wrong during a trip. What was the problem, and what did you do?"
   ]},
-  {title:"친구에게 물건 빌리기", qs:[
+  {day:"화", title:"헬스장 등록", qs:[
+    "You want to sign up for a new gym. Call the gym and ask three or four questions about its membership, facilities, and operating hours.",
+    "You just found out that the gym is closed during the hours you usually work out. Call the gym, explain the problem, and suggest a solution.",
+    "Have you ever had a problem with a gym, sports club, or class? What happened, and how did you deal with it?"
+  ]},
+  {day:"수", title:"공연 티켓", qs:[
+    "Your friend is going to a concert. Call your friend and ask three or four questions about the concert, such as the date, venue, and ticket price.",
+    "You can no longer attend because something unexpected came up. Call your friend, explain the situation, and suggest what to do with your ticket.",
+    "Tell me about a time when you had to cancel or change plans for an event. What happened?"
+  ]},
+  {day:"목", title:"스마트폰 구매", qs:[
+    "You want to buy a new smartphone. Call an electronics store and ask three or four questions about the models, prices, and available features.",
+    "After buying the phone, you discover that it has a problem. Call the store, explain the issue, and ask them to help you resolve it.",
+    "Have you ever bought something that didn't work properly? Describe what happened and how you handled it."
+  ]},
+  {day:"금", title:"친구에게 물건 빌리기", qs:[
     "You want to borrow a camera from your friend for a weekend trip. Call your friend and ask three or four questions about the camera and when you can pick it up.",
     "You accidentally damage the camera. Call your friend, explain what happened, and suggest how you will make it right.",
     "Have you ever borrowed or lent something that got lost or damaged? Tell me what happened."
   ]}
 ];
 const ROLE_TYPES = [{no:11, type:"질문하기"}, {no:12, type:"문제해결"}, {no:13, type:"관련경험"}];
-const setNo = parseInt(new URLSearchParams(location.search).get("set"), 10);
-const SET = SETS[setNo - 1] || null;
-const QUESTIONS = SET ? SET.qs.map((text, i) => ({no:ROLE_TYPES[i].no, type:ROLE_TYPES[i].type, label:SET.title + " · " + ROLE_TYPES[i].no + "번 " + ROLE_TYPES[i].type, text})) : [];
 const START_DATE = "2026-11-21";  // 숙제 시작일 (이날부터 사용 가능)
 const VALID_DAYS = 10;            // 시작일 포함 며칠 동안 열리는지
 const MAX_REPLAYS = 2;       // 첫 듣기 이후 다시 듣기 횟수
@@ -173,10 +178,18 @@ const lastDayText = kstDay(lastDay);
 const expired = Date.now() >= closeAt.getTime();
 const notYet = Date.now() < openAt.getTime();
 const configured = /^https:\/\/script\.google\.com\//.test(API_URL);
-const sid = (crypto.randomUUID ? crypto.randomUUID() : String(Math.random()) + Date.now()).replace(/[^a-zA-Z0-9]/g, "").slice(0, 32);
+const newSid = () => (crypto.randomUUID ? crypto.randomUUID() : String(Math.random()) + Date.now()).replace(/[^a-zA-Z0-9]/g, "").slice(0, 32);
 
+// 요일마다 따로: 제출ID, 문항 상태, 제출 링크
 // phase: idle | recording | uploading | ready | error
-const state = QUESTIONS.map(() => ({plays:0, scriptShown:false, phase:"idle", wav:null, url:null, transcript:"", evalr:null, warn:"", seconds:0, done:false}));
+const dayData = DAYS.map(D => ({
+  sid: newSid(), link: "",
+  questions: D.qs.map((text, i) => ({no:ROLE_TYPES[i].no, type:ROLE_TYPES[i].type, label:D.day + " · " + D.title + " · " + ROLE_TYPES[i].no + "번 " + ROLE_TYPES[i].type, text})),
+  state: D.qs.map(() => ({plays:0, scriptShown:false, phase:"idle", wav:null, url:null, transcript:"", evalr:null, warn:"", seconds:0, done:false}))
+}));
+const todayIdx = (() => { const w = new Date(Date.now() + 9 * 3600000).getUTCDay(); return w >= 1 && w <= 5 ? w - 1 : 0; })();
+let dayIdx = Math.min(DAYS.length - 1, Math.max(0, (parseInt(new URLSearchParams(location.search).get("day"), 10) || todayIdx + 1) - 1));
+let sid = dayData[dayIdx].sid, state = dayData[dayIdx].state, QUESTIONS = dayData[dayIdx].questions;
 let cur = 0, speaking = false, recIndex = -1, submitted = false;
 let stream = null, recorder = null, chunks = [], tick = null, startAt = 0, micLost = false;
 
@@ -263,6 +276,43 @@ async function startRec(){
   render();
 }
 
+/* 폰 기본 녹음기로 녹음 (웹 마이크가 안 될 때) */
+let nativeInput = null;
+function startNative(){
+  if (busy()) return;
+  if (!configured){ toast("선생님 설정이 필요해요."); return; }
+  const name = $("studentName").value.trim();
+  if (!name){ toast("녹음 전에 이름을 입력해 주세요."); $("studentName").focus(); return; }
+  if ("speechSynthesis" in window) speechSynthesis.cancel();
+  speaking = false;
+  if (!nativeInput){
+    nativeInput = document.createElement("input");
+    nativeInput.type = "file"; nativeInput.accept = "audio/*"; nativeInput.setAttribute("capture", "");
+    nativeInput.style.display = "none"; document.body.appendChild(nativeInput);
+    nativeInput.onchange = onNativeFile;
+  }
+  nativeInput.dataset.q = cur; nativeInput.dataset.day = dayIdx;
+  nativeInput.value = ""; nativeInput.click();
+}
+async function onNativeFile(){
+  const f = nativeInput.files && nativeInput.files[0];
+  if (!f) return;
+  if (Number(nativeInput.dataset.day) !== dayIdx){ toast("요일이 바뀌어서 취소됐어요. 다시 녹음해 주세요."); return; }
+  const i = Number(nativeInput.dataset.q), s = state[i];
+  if (s.url) URL.revokeObjectURL(s.url);
+  Object.assign(s, {phase:"uploading", wav:null, url:null, transcript:"", evalr:null, warn:"", seconds:0, done:false});
+  recIndex = i; $("studentName").readOnly = true; render();
+  let samples;
+  try { samples = await decodeTo16k(f); }
+  catch(e){ s.phase = "idle"; render(); toast("이 녹음 파일은 열 수 없어요. 다른 녹음 앱으로 다시 해 주세요."); return; }
+  if (samples.length < TARGET_RATE * 0.5){ s.phase = "idle"; render(); toast("녹음된 소리가 없어요."); return; }
+  if (samples.length > TARGET_RATE * MAX_SECONDS) samples = samples.subarray(0, TARGET_RATE * MAX_SECONDS);
+  s.seconds = Math.round(samples.length / TARGET_RATE);
+  s.wav = encodeWav(normalize(samples), TARGET_RATE);
+  s.url = URL.createObjectURL(s.wav);
+  upload(i);
+}
+
 function stopRec(){
   const s = state[recIndex];
   if (!s || s.phase !== "recording") return;
@@ -286,7 +336,7 @@ async function finishRec(){
   }
   if (samples.length < TARGET_RATE * 0.5){
     s.phase = "idle"; render();
-    toast(micLost ? "녹음 중에 마이크가 끊겼어요. 다른 앱(통화·음악·카톡 보이스톡)을 끄고 다시 녹음해 주세요." : "녹음된 소리가 없어요. 다시 녹음해 주세요.");
+    toast(micLost ? "녹음 중에 마이크가 끊겼어요. 통화·음악·음성비서 앱을 끄고, 블루투스를 껐다 켠 뒤 다시 녹음해 주세요." : "녹음된 소리가 없어요. 다시 녹음해 주세요.");
     return;
   }
   if (micLost) toast("녹음 중에 마이크가 끊겨서 거기까지만 저장됐어요.");
@@ -391,7 +441,7 @@ function confirmAnswer(){
   const next = state.findIndex(x => !x.done);
   if (next !== -1) cur = next;
   render();
-  toast(next === -1 ? QUESTIONS.length + "문항 모두 완료! 아래에서 제출하세요." : "담았어요. Q" + QUESTIONS[next].no + "로 넘어갑니다.");
+  toast(next === -1 ? DAYS[dayIdx].day + "요일 3문항 완료! 아래에서 제출하세요." : "담았어요. Q" + QUESTIONS[next].no + "로 넘어갑니다.");
 }
 
 /* ---------- 화면 ---------- */
@@ -401,13 +451,39 @@ function esc(s){ return String(s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&l
 function evalBox(e){
   if (!e) return "";
   const li = a => (a || []).map(x => `<li>${esc(x)}</li>`).join("");
-  let h = `<div class="eval"><div class="evlabel">AI 평가 <span>참고용</span></div>`;
+  let h = `<div class="eval"><div class="evlabel">Cleo's TIP <span>AI 평가 · 참고용</span></div>`;
   h += `<p class="evtop">${e.level ? `<span class="lv">${esc(e.level)}</span>` : ""}${esc(e.summary || "")}</p>`;
-  if (e.good && e.good.length) h += `<p class="evh">잘한 점</p><ul>${li(e.good)}</ul>`;
-  if (e.fix && e.fix.length) h += `<p class="evh">보완점</p><ul>${li(e.fix)}</ul>`;
-  if (e.better && e.better.length) h += `<p class="evh">이렇게 말해 보세요</p>` + e.better.map(b =>
-    `<p class="bt" lang="en">${b.from ? `<s>${esc(b.from)}</s><br>` : ""}→ ${esc(b.to)}</p>`).join("");
+  if (e.good && e.good.length) h += `<p class="evh">① 잘한 점</p><ul>${li(e.good)}</ul>`;
+  if (e.fix && e.fix.length) h += `<p class="evh">② 보완할 점</p><ul>${li(e.fix)}</ul>`;
+  if (e.pron && e.pron.length) h += `<p class="evh">③ 발음 주의</p><ul>${e.pron.map(p => `<li><b lang="en">${esc(p.word || "")}</b> ${esc(p.tip || "")}</li>`).join("")}</ul>`;
+  const fx = e.corrections || e.better || [];
+  if (fx.length) h += `<p class="evh">④ 틀린 문장 고치기</p>` + fx.map(b =>
+    `<p class="bt">${b.from ? `<s lang="en">${esc(b.from)}</s><br>` : ""}<span lang="en">→ ${esc(b.to)}</span>${b.why ? `<br><small>${esc(b.why)}</small>` : ""}</p>`).join("");
   return h + `</div>`;
+}
+
+function renderDays(){
+  const nav = $("days"); nav.innerHTML = "";
+  DAYS.forEach((D, i) => {
+    const b = document.createElement("button");
+    const sent = !!dayData[i].link;
+    b.className = "day" + (sent ? " sent" : "");
+    b.setAttribute("role", "tab"); b.setAttribute("aria-selected", i === dayIdx);
+    b.disabled = busy() && i !== dayIdx;
+    b.innerHTML = `<b>${D.day}</b><span>${sent ? "제출완료" : esc(D.title)}</span>`;
+    b.onclick = () => selectDay(i);
+    nav.appendChild(b);
+  });
+}
+
+function selectDay(i){
+  if (i === dayIdx || busy()) return;
+  if ("speechSynthesis" in window) speechSynthesis.cancel();
+  speaking = false;
+  dayIdx = i; sid = dayData[i].sid; state = dayData[i].state; QUESTIONS = dayData[i].questions;
+  cur = Math.max(0, state.findIndex(x => !x.done)); 
+  const btn = $("submitBtn"); delete btn.dataset.sure;
+  render();
 }
 
 function renderTabs(){
@@ -435,20 +511,21 @@ function renderCard(){
   if (s.phase === "recording"){
     recArea = `<button class="btn rec" id="stopBtn">■ 녹음 끝내기</button><span class="timer" id="timer">${fmt(s.seconds)}</span><span class="recdot">녹음 중</span>`;
   } else if (s.phase === "idle"){
-    recArea = `<button class="btn rec" id="recBtn" ${speaking || busy() ? "disabled" : ""}>● 녹음 시작</button><span class="hint">최대 ${MAX_SECONDS / 60}분</span>`;
+    recArea = `<button class="btn rec" id="recBtn" ${busy() ? "disabled" : ""}>● 녹음 시작</button><span class="hint">최대 ${MAX_SECONDS / 60}분</span>`;
   } else {
     recArea = `<span class="timer">${fmt(s.seconds)}</span><span class="hint">녹음 완료</span>`;
   }
 
   let tBox;
-  if (s.phase === "uploading") tBox = `<div class="transcript wait">스크립트와 AI 평가를 만들고 있어요… (10~30초)</div>`;
+  if (s.phase === "uploading") tBox = `<div class="transcript wait">스크립트와 Cleo's TIP을 만들고 있어요… (10~40초)</div>`;
   else if (s.transcript) tBox = `<div class="transcript" lang="en">${esc(s.transcript)}</div>`;
   else tBox = `<div class="transcript wait">녹음을 끝내면 답변이 영어 스크립트로 여기에 나타나요.</div>`;
 
   const showReview = s.wav && (s.phase === "ready" || s.phase === "error" || s.phase === "uploading");
 
   card.innerHTML = `
-    <div class="qhead"><span class="chip">${esc(q.label || q.type)}</span><span class="qnum">QUESTION ${q.no}</span></div>
+    <p class="daytitle">${DAYS[dayIdx].day}요일 · ${esc(DAYS[dayIdx].title)}</p>
+    <div class="qhead"><span class="chip">${q.no}번 ${esc(q.type)}</span><span class="qnum">QUESTION ${q.no}</span></div>
 
     <div class="step">
       <h3>1. 질문 듣기 · 미국식 발음</h3>
@@ -460,6 +537,8 @@ function renderCard(){
     <div class="step">
       <h3>2. 영어로 답변 녹음</h3>
       <div class="recbar">${recArea}</div>
+      ${s.phase === "idle" ? `<p class="hint">조용한 곳에서, 폰을 입에서 한 뼘 거리에 두고 녹음하세요.</p>
+      <button class="linkbtn" id="nativeBtn" ${busy() ? "disabled" : ""}>녹음이 계속 끊기면 → 폰 녹음기로 녹음하기</button>` : ""}
     </div>
 
     ${showReview ? `
@@ -480,6 +559,7 @@ function renderCard(){
     </div>` : ""}
   `;
   const on = (id, fn) => { const el = $(id); if (el) el.onclick = fn; };
+  on("nativeBtn", startNative);
   on("listenBtn", onListen); on("recBtn", startRec); on("stopBtn", stopRec);
   on("reBtn", reRecord); on("okBtn", confirmAnswer); on("retryBtn", () => upload(cur));
   on("copyTBtn", () => copyText(state[cur].transcript, "스크립트를 복사했어요."));
@@ -488,10 +568,14 @@ function renderCard(){
 function renderSubmit(){
   const n = state.filter(s => s.done).length;
   $("progress").textContent = `제출 준비 ${n} / ${QUESTIONS.length}문항`;
-  $("submitBtn").disabled = n === 0 || busy();
+  const btn = $("submitBtn"), link = dayData[dayIdx].link;
+  btn.disabled = n === 0 || busy();
+  if (btn.textContent !== "제출 중…") btn.textContent = link ? "다시 제출하기" : (btn.dataset.sure ? `${n}문항만 제출하기` : `${DAYS[dayIdx].day}요일 숙제 제출하고 링크 받기`);
+  $("linkBox").textContent = link;
+  $("linkArea").hidden = !link;
 }
 
-function render(){ renderTabs(); renderCard(); renderSubmit(); }
+function render(){ renderDays(); renderTabs(); renderCard(); renderSubmit(); }
 
 /* ---------- 제출 ---------- */
 async function submitAll(){
@@ -503,19 +587,17 @@ async function submitAll(){
     toast(`아직 ${QUESTIONS.length - qs.length}문항이 남았어요. 그래도 제출하려면 한 번 더 누르세요.`);
     return;
   }
-  const btn = $("submitBtn");
+  const btn = $("submitBtn"), d = dayIdx;
   btn.disabled = true; btn.textContent = "제출 중…";
   try {
-    const j = await api({action:"finalize", sid, name:$("studentName").value.trim(), qs});
-    $("linkBox").textContent = j.link;
-    $("linkArea").hidden = false;
-    btn.textContent = "다시 제출하기";
-    toast("제출 완료! 링크를 복사해서 보내주세요.");
+    const j = await api({action:"finalize", sid:dayData[d].sid, name:$("studentName").value.trim(), qs});
+    dayData[d].link = j.link;
+    toast(DAYS[d].day + "요일 제출 완료! 링크를 복사해서 보내주세요.");
   } catch(e){
-    btn.textContent = "제출하고 링크 받기";
     toast("제출에 실패했어요. 잠시 후 다시 눌러주세요.");
   }
-  btn.disabled = false;
+  btn.textContent = "";
+  render();
 }
 
 async function copyText(text, okMsg){
@@ -532,14 +614,14 @@ let toastTimer;
 function toast(m){ const t = $("toast"); t.textContent = m; t.hidden = false; clearTimeout(toastTimer); toastTimer = setTimeout(() => t.hidden = true, 3000); }
 
 $("submitBtn").onclick = submitAll;
-$("copyLinkBtn").onclick = () => copyText(`[클레오픽 숙제] ${$("studentName").value.trim()}\n${$("linkBox").textContent}`, "링크를 복사했어요. 카톡에 붙여넣어 보내세요.");
+$("copyLinkBtn").onclick = () => copyText(`[클레오픽 숙제] ${$("studentName").value.trim()} · ${DAYS[dayIdx].day}요일 ${DAYS[dayIdx].title}\n${$("linkBox").textContent}`, "링크를 복사했어요. 카톡에 붙여넣어 보내세요.");
 $("configWarn").hidden = configured;
 try { $("studentName").value = localStorage.getItem("cleopic_name") || ""; } catch(_){}
 $("studentName").addEventListener("input", e => { try { localStorage.setItem("cleopic_name", e.target.value); } catch(_){} });
-window.addEventListener("beforeunload", e => { if (state.some(s => s.wav) && $("linkArea").hidden){ e.preventDefault(); e.returnValue = ""; } });
+window.addEventListener("beforeunload", e => { if (dayData.some(D => !D.link && D.state.some(s => s.wav))){ e.preventDefault(); e.returnValue = ""; } });
 function hideMain(){
   $("configWarn").hidden = true;
-  [document.querySelector(".name"), $("tabs"), $("card"), document.querySelector(".submit")].forEach(el => el.style.display = "none");
+  [$("days"), document.querySelector(".name"), $("tabs"), $("card"), document.querySelector(".submit")].forEach(el => el.style.display = "none");
 }
 if (expired || notYet){
   hideMain();
@@ -549,18 +631,10 @@ if (expired || notYet){
     ? `<h2>사용기한이 끝났어요</h2><p>이 숙제는 ${lastDayText}까지였어요. 선생님께 문의해 주세요.</p>`
     : `<h2>아직 열리지 않았어요</h2><p>${kstDay(openAt)}부터 할 수 있어요.</p>`;
   document.querySelector(".wrap").appendChild(box);
-} else if (SET){
-  document.title = "클레오픽 · " + SET.title;
-  $("subText").textContent = SET.title + " · 롤플레이 " + QUESTIONS.length + "문항 녹음 숙제 · " + lastDayText + "까지";
-  $("tabs").style.setProperty("--cols", QUESTIONS.length);
-  render();
 } else {
-  // 세트를 고르지 않고 들어오면 세트 목록을 보여줌
-  hideMain();
-  $("subText").textContent = "숙제 세트를 골라주세요. (" + lastDayText + "까지)";
-  const box = document.createElement("nav"); box.className = "chooser";
-  box.innerHTML = SETS.map((st, i) => `<a href="?set=${i + 1}"><b>SET ${i + 1}</b><span>${esc(st.title)}</span></a>`).join("");
-  document.querySelector(".wrap").appendChild(box);
+  $("subText").textContent = "하루에 한 세트(11·12·13번)씩 녹음해서 제출하세요 · " + lastDayText + "까지";
+  $("tabs").style.setProperty("--cols", 3);
+  render();
 }
 </script>
 </body>
