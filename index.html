@@ -71,6 +71,15 @@ button:focus-visible,input:focus-visible{outline:3px solid var(--accent);outline
 .transcript.wait{color:var(--muted)}
 audio{width:100%}
 .err{font-size:.9rem;color:var(--rec);margin:0}
+.eval{background:var(--soft);border-radius:12px;padding:14px 16px;display:flex;flex-direction:column;gap:2px}
+.eval p{margin:0}.eval ul{margin:2px 0 6px;padding-left:20px}
+.evlabel{font-size:.8rem;font-weight:700;letter-spacing:.08em;color:var(--muted)}.evlabel span{font-weight:400;margin-left:4px}
+.evtop{font-weight:700;margin:4px 0 4px!important}
+.lv{display:inline-block;background:var(--accent);color:var(--accent-ink);border-radius:6px;padding:0 8px;margin-right:8px;font-family:var(--mono);font-size:.85rem}
+.evh{font-size:.8rem;font-weight:700;color:var(--accent);margin-top:6px!important}
+.bt{margin:2px 0 6px!important}.bt s{color:var(--muted)}
+.closed{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:24px 20px;text-align:center}
+.closed h2{font-family:var(--display);font-weight:400;font-size:1.5rem;margin:0 0 6px}.closed p{margin:0;color:var(--muted)}
 .submit{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:20px;display:flex;flex-direction:column;gap:12px}
 .submit h2{font-family:var(--display);font-weight:400;font-size:1.5rem;margin:0}
 .progress{font-family:var(--mono);font-size:.9rem;color:var(--muted)}
@@ -147,16 +156,25 @@ const ROLE_TYPES = [{no:11, type:"질문하기"}, {no:12, type:"문제해결"}, 
 const setNo = parseInt(new URLSearchParams(location.search).get("set"), 10);
 const SET = SETS[setNo - 1] || null;
 const QUESTIONS = SET ? SET.qs.map((text, i) => ({no:ROLE_TYPES[i].no, type:ROLE_TYPES[i].type, label:SET.title + " · " + ROLE_TYPES[i].no + "번 " + ROLE_TYPES[i].type, text})) : [];
+const START_DATE = "2026-11-21";  // 숙제 시작일 (이날부터 사용 가능)
+const VALID_DAYS = 10;            // 시작일 포함 며칠 동안 열리는지
 const MAX_REPLAYS = 2;       // 첫 듣기 이후 다시 듣기 횟수
 const MAX_SECONDS = 180;     // 녹음 최대 3분
 const TARGET_RATE = 16000;   // 저장 음질 (16kHz 모노 WAV)
 /* ====================== */
 
+const openAt = new Date(START_DATE + "T00:00:00+09:00");
+const closeAt = new Date(openAt.getTime() + VALID_DAYS * 86400000);
+const lastDay = new Date(closeAt.getTime() - 86400000);
+const kstDay = d => { const k = new Date(d.getTime() + 9 * 3600000); return (k.getUTCMonth() + 1) + "월 " + k.getUTCDate() + "일"; };   // 한국 날짜로 표시
+const lastDayText = kstDay(lastDay);
+const expired = Date.now() >= closeAt.getTime();
+const notYet = Date.now() < openAt.getTime();
 const configured = /^https:\/\/script\.google\.com\//.test(API_URL);
 const sid = (crypto.randomUUID ? crypto.randomUUID() : String(Math.random()) + Date.now()).replace(/[^a-zA-Z0-9]/g, "").slice(0, 32);
 
 // phase: idle | recording | uploading | ready | error
-const state = QUESTIONS.map(() => ({plays:0, scriptShown:false, phase:"idle", wav:null, url:null, transcript:"", warn:"", seconds:0, done:false}));
+const state = QUESTIONS.map(() => ({plays:0, scriptShown:false, phase:"idle", wav:null, url:null, transcript:"", evalr:null, warn:"", seconds:0, done:false}));
 let cur = 0, speaking = false, recIndex = -1, submitted = false;
 let audioCtx = null, stream = null, source = null, node = null, mute = null, pcm = [], inRate = 48000, tick = null, startAt = 0;
 
@@ -248,7 +266,7 @@ async function startRec(){
 
   const s = state[cur];
   if (s.url) URL.revokeObjectURL(s.url);
-  Object.assign(s, {phase:"recording", wav:null, url:null, transcript:"", warn:"", seconds:0, done:false});
+  Object.assign(s, {phase:"recording", wav:null, url:null, transcript:"", evalr:null, warn:"", seconds:0, done:false});
   recIndex = cur;
   $("studentName").readOnly = true;                    // 같은 학생 폴더로 저장되도록 이름 고정
   startAt = Date.now();
@@ -354,6 +372,7 @@ async function upload(i){
       data: await blobToBase64(s.wav)
     });
     s.transcript = j.transcript || "";
+    s.evalr = j.evaluation || null;
     s.warn = j.warn || "";
     s.phase = "ready";
   } catch(e){
@@ -377,6 +396,18 @@ function confirmAnswer(){
 /* ---------- 화면 ---------- */
 function fmt(sec){ return Math.floor(sec / 60) + ":" + String(sec % 60).padStart(2, "0"); }
 function esc(s){ return String(s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
+
+function evalBox(e){
+  if (!e) return "";
+  const li = a => (a || []).map(x => `<li>${esc(x)}</li>`).join("");
+  let h = `<div class="eval"><div class="evlabel">AI 평가 <span>참고용</span></div>`;
+  h += `<p class="evtop">${e.level ? `<span class="lv">${esc(e.level)}</span>` : ""}${esc(e.summary || "")}</p>`;
+  if (e.good && e.good.length) h += `<p class="evh">잘한 점</p><ul>${li(e.good)}</ul>`;
+  if (e.fix && e.fix.length) h += `<p class="evh">보완점</p><ul>${li(e.fix)}</ul>`;
+  if (e.better && e.better.length) h += `<p class="evh">이렇게 말해 보세요</p>` + e.better.map(b =>
+    `<p class="bt" lang="en">${b.from ? `<s>${esc(b.from)}</s><br>` : ""}→ ${esc(b.to)}</p>`).join("");
+  return h + `</div>`;
+}
 
 function renderTabs(){
   const nav = $("tabs"); nav.innerHTML = "";
@@ -409,7 +440,7 @@ function renderCard(){
   }
 
   let tBox;
-  if (s.phase === "uploading") tBox = `<div class="transcript wait">스크립트를 만들고 있어요… (5~15초)</div>`;
+  if (s.phase === "uploading") tBox = `<div class="transcript wait">스크립트와 AI 평가를 만들고 있어요… (10~30초)</div>`;
   else if (s.transcript) tBox = `<div class="transcript" lang="en">${esc(s.transcript)}</div>`;
   else tBox = `<div class="transcript wait">녹음을 끝내면 답변이 영어 스크립트로 여기에 나타나요.</div>`;
 
@@ -435,6 +466,7 @@ function renderCard(){
       <h3>3. 들어보고 결정하기</h3>
       <audio controls src="${s.url}"></audio>
       ${tBox}
+      ${evalBox(s.evalr)}
       ${s.warn ? `<p class="err">${esc(s.warn)}</p>` : ""}
       <div class="row">
         <button class="btn" id="copyTBtn" ${s.transcript ? "" : "disabled"}>스크립트 복사</button>
@@ -504,16 +536,27 @@ $("configWarn").hidden = configured;
 try { $("studentName").value = localStorage.getItem("cleopic_name") || ""; } catch(_){}
 $("studentName").addEventListener("input", e => { try { localStorage.setItem("cleopic_name", e.target.value); } catch(_){} });
 window.addEventListener("beforeunload", e => { if (state.some(s => s.wav) && $("linkArea").hidden){ e.preventDefault(); e.returnValue = ""; } });
-if (SET){
+function hideMain(){
+  $("configWarn").hidden = true;
+  [document.querySelector(".name"), $("tabs"), $("card"), document.querySelector(".submit")].forEach(el => el.style.display = "none");
+}
+if (expired || notYet){
+  hideMain();
+  $("subText").textContent = "";
+  const box = document.createElement("section"); box.className = "closed";
+  box.innerHTML = expired
+    ? `<h2>사용기한이 끝났어요</h2><p>이 숙제는 ${lastDayText}까지였어요. 선생님께 문의해 주세요.</p>`
+    : `<h2>아직 열리지 않았어요</h2><p>${kstDay(openAt)}부터 할 수 있어요.</p>`;
+  document.querySelector(".wrap").appendChild(box);
+} else if (SET){
   document.title = "클레오픽 · " + SET.title;
-  $("subText").textContent = SET.title + " · 롤플레이 " + QUESTIONS.length + "문항 녹음 숙제. 질문을 듣고 영어로 답변하세요.";
+  $("subText").textContent = SET.title + " · 롤플레이 " + QUESTIONS.length + "문항 녹음 숙제 · " + lastDayText + "까지";
   $("tabs").style.setProperty("--cols", QUESTIONS.length);
   render();
 } else {
   // 세트를 고르지 않고 들어오면 세트 목록을 보여줌
-  ["configWarn"].forEach(id => $(id).hidden = true);
-  [document.querySelector(".name"), $("tabs"), $("card"), document.querySelector(".submit")].forEach(el => el.style.display = "none");
-  $("subText").textContent = "오늘 숙제 세트를 골라주세요.";
+  hideMain();
+  $("subText").textContent = "숙제 세트를 골라주세요. (" + lastDayText + "까지)";
   const box = document.createElement("nav"); box.className = "chooser";
   box.innerHTML = SETS.map((st, i) => `<a href="?set=${i + 1}"><b>SET ${i + 1}</b><span>${esc(st.title)}</span></a>`).join("");
   document.querySelector(".wrap").appendChild(box);
